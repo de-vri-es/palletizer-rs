@@ -1,0 +1,9 @@
+[package]
+name = "palletizer"
+description = "self-hosted Cargo registry"
+version = "0.0.0"
+authors = ["Maarten de Vries <maarten@de-vri.es>"]
+license = "BSD-2-Clause"
+edition = "2018"
+
+[dependencies]
