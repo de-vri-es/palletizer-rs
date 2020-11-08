@@ -2,29 +2,45 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum InitError {
+pub enum InitRegistryError {
 	#[error("failed to initialize git repository: {0}")]
 	GitInit(git2::Error),
 	#[error("{0}")]
 	WriteFailed(#[from] WriteFailed),
+	#[error("{0}")]
+	CreateDir(#[from] CreateDirError),
+	#[error("failed to commit changes: {0}")]
+	CommitFailed(git2::Error),
 }
 
 #[derive(Debug, Error)]
-pub enum OpenError {
+pub enum OpenRegistryError {
 	#[error("failed to read git repository: {0}")]
 	GitOpen(git2::Error),
+	#[error("{0}")]
+	ReadConfig(#[from] ReadTomlError),
+}
+
+#[derive(Debug, Error)]
+pub enum AddCrateFromFileError {
+	#[error("{0}")]
+	InvalidFileName(#[from] InvalidCrateFileName),
+	#[error("{0}")]
+	ReadFailed(#[from] ReadFailed),
+	#[error("{0}")]
+	AddCrateError(#[from] AddCrateError),
 }
 
 #[derive(Debug, Error)]
 pub enum AddCrateError {
 	#[error("{0}")]
-	InvalidFileName(#[from] InvalidCrateFileName),
-	#[error("{0}")]
-	DuplicateCrate(#[from] DuplicateCrateVersion),
-	#[error("{0}")]
 	ReadIndex(#[from] ReadIndexError),
 	#[error("{0}")]
-	ReadFailed(#[from] ReadFailed),
+	LockFailed(#[from] LockFailed),
+	#[error("{0}")]
+	DuplicateIndexEntry(#[from] DuplicateIndexEntry),
+	#[error("{0}")]
+	WriteFailed(#[from] WriteFailed),
 	#[error("failed to commit changes: {0}")]
 	CommitFailed(git2::Error),
 }
@@ -49,14 +65,29 @@ impl ReadIndexError {
 }
 
 #[derive(Debug, Error)]
+pub enum ReadTomlError {
+	#[error("{0}")]
+	ReadFailed(#[from] ReadFailed),
+	#[error("invalid UTF-8 in index: {0}")]
+	ParseToml(#[from] ParseTomlError),
+}
+
+#[derive(Debug, Error)]
+#[error("failed to parse TOML file: {path}: {error}")]
+pub struct ParseTomlError {
+	pub path: PathBuf,
+	pub error: toml::de::Error,
+}
+
+#[derive(Debug, Error)]
 #[error("invalid file name for packaged crate: expected $name-$version.crate")]
 pub struct InvalidCrateFileName {
 	pub path: PathBuf,
 }
 
 #[derive(Debug, Error)]
-#[error("duplicate crate: {name}-{version} already exists in registry")]
-pub struct DuplicateCrateVersion {
+#[error("duplicate index entry: {name}-{version} already exists in registry")]
+pub struct DuplicateIndexEntry {
 	pub name: String,
 	pub version: String,
 }
@@ -66,6 +97,16 @@ pub struct DuplicateCrateVersion {
 pub enum YankCrateError {
 	#[error("failed to commit changes: {0}")]
 	CommitFailed(git2::Error),
+}
+
+#[derive(Debug, Error)]
+#[error("failed to create directory {path}: {error}")]
+pub struct CreateDirError {
+	/// The path to the directory.
+	pub path: PathBuf,
+
+	/// The I/O error that occured.
+	pub error: std::io::Error,
 }
 
 #[derive(Debug, Error)]
@@ -96,4 +137,32 @@ pub struct WriteFailed {
 
 	/// The I/O error that occured.
 	pub error: std::io::Error,
+}
+
+#[derive(Debug, Error)]
+#[error("failed to lock {path} for {mode} access: {error}")]
+pub struct LockFailed {
+	/// The file that failed to read.
+	pub path: PathBuf,
+
+	/// The lock mode.
+	pub mode: LockMode,
+
+	/// The I/O error that occured.
+	pub error: std::io::Error,
+}
+
+#[derive(Debug)]
+pub enum LockMode {
+	Shared,
+	Exclusive,
+}
+
+impl std::fmt::Display for LockMode {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Shared => "shared".fmt(f),
+			Self::Exclusive => "exclusive".fmt(f),
+		}
+	}
 }
