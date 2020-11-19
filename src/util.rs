@@ -28,10 +28,26 @@ pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Pa
 
 	let mut index = repo.index()
 		.map_err(|e| Error::new(format!("failed to get index of repository: {}", e)))?;
-	if !index.is_empty() {
-		return Err(Error::new(format!("can not commit changes, index contains stages changes")));
+
+	// Make sure the repo isn't busy rebasing or anything like that.
+	if repo.state() != git2::RepositoryState::Clean {
+		return Err(Error::new(format!("repository is in {:?} state", repo.state())));
 	}
 
+	// Make sure the index is clean (don't care about the work tree).
+	if let Some(head) = &head {
+		let head_tree = head.tree()
+				.map_err(|e| Error::new(format!("failed to find tree for HEAD: {}", e)))?;
+		let staged = repo.diff_tree_to_index(Some(&head_tree), Some(&index), None)
+			.map_err(|e| Error::new(format!("failed to compare tree with index: {}", e)))?;
+		if staged.deltas().next().is_some() {
+			return Err(Error::new(format!("index already contains staged changes")));
+		}
+	} else if !index.is_empty() {
+		return Err(Error::new(format!("index already contains staged changes")));
+	}
+
+	// Add the files to the index.
 	for path in files {
 		let path = path.as_ref();
 		index.add_path(path)
@@ -39,18 +55,18 @@ pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Pa
 	}
 	index.write().map_err(|e| Error::new(format!("failed to write index back to disk: {}", e)))?;
 
+	// Create a tree from the index.
 	let tree = index.write_tree()
 		.map_err(|e| Error::new(format!("failed to write index to a tree: {}", e)))?;
 	let tree = repo.find_tree(tree)
 		.map_err(|e| Error::new(format!("failed to find newly written tree with OID {}: {}", tree, e)))?;
 
-	let result;
-	if let Some(head) = head {
-		result = repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[&head]);
+	// Create the commit.
+	let result = if let Some(head) = head {
+		repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[&head])
 	} else {
-		result = repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[]);
-	}
-
+		repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])
+	};
 	result.map_err(|e| Error::new(format!("failed to create commit: {}", e)))
 }
 

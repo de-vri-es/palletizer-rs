@@ -104,7 +104,8 @@ impl Registry {
 			.map_err(|e| Error::new(format!("failed to write to index file {}: {}", index_path.display(), e)))?;
 
 		// Commit the changes.
-		util::add_commit(&self.repo, &format!("Add {}-{}", name, version), &[index_path_rel])?;
+		util::add_commit(&self.repo, &format!("Add {}-{}", name, version), &[index_path_rel])
+			.map_err(|e| Error::new(format!("failed to commit changes: {}", e)))?;
 
 		Ok(())
 	}
