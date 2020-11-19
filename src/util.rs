@@ -3,31 +3,55 @@ use std::path::Path;
 
 use crate::error::Error;
 
+fn get_head(repo: &git2::Repository) -> Result<Option<git2::Commit>, Error> {
+	let head = match repo.head() {
+		Ok(head) => head,
+		Err(e) => if e.code() == git2::ErrorCode::UnbornBranch {
+			return Ok(None);
+		} else {
+			return Err(Error::new(format!("failed to determine repository HEAD: {}", e)));
+		}
+	};
+
+	let head = head.peel_to_commit()
+		.map_err(|e| Error::new(format!("failed to resolve HEAD to commit hash: {}", e)))?;
+
+	Ok(Some(head))
+}
+
 /// Add the given files to the index and commit the index.
 pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Path>]) -> Result<git2::Oid, Error> {
 	let signature = repo.signature()
 		.map_err(|e| Error::new(format!("failed to determine author for git commit: {}", e)))?;
-	let head = repo.head()
-		.map_err(|e| Error::new(format!("failed to determine repository HEAD: {}", e)))?
-		.peel_to_commit()
-		.map_err(|e| Error::new(format!("failed to resolve HEAD to commit hash: {}", e)))?;
 
+	let head = get_head(repo)?;
 
 	let mut index = repo.index()
-		.map_err(|e| Error::new(format!("failed to retrieve repository index: {}", e)))?;
+		.map_err(|e| Error::new(format!("failed to get index of repository: {}", e)))?;
+	if !index.is_empty() {
+		return Err(Error::new(format!("can not commit changes, index contains stages changes")));
+	}
+
 	for path in files {
 		let path = path.as_ref();
 		index.add_path(path)
 			.map_err(|e| Error::new(format!("failed to add {} to index: {}", path.display(), e)))?;
 	}
+	index.write().map_err(|e| Error::new(format!("failed to write index back to disk: {}", e)))?;
 
 	let tree = index.write_tree()
 		.map_err(|e| Error::new(format!("failed to write index to a tree: {}", e)))?;
 	let tree = repo.find_tree(tree)
 		.map_err(|e| Error::new(format!("failed to find newly written tree with OID {}: {}", tree, e)))?;
 
-	repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[&head])
-		.map_err(|e| Error::new(format!("failed to create commit: {}", e)))
+	let result;
+	if let Some(head) = head {
+		result = repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[&head]);
+	} else {
+		result = repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[]);
+	}
+
+	result.map_err(|e| Error::new(format!("failed to create commit: {}", e)))
 }
 
 /// Create a directory and all leading directories.

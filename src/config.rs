@@ -15,9 +15,14 @@ pub struct Config {
 	/// See also https://doc.rust-lang.org/cargo/reference/registries.html#index-format
 	pub api_url: String,
 
+	/// The path to the index repository.
+	///
+	/// Relative paths are resolved relative to directory that contains the config file.
+	pub index_dir: String,
+
 	/// The path where crates are stored.
 	///
-	/// Relative paths are resolved relative to the parent folder of the config file.
+	/// Relative paths are resolved relative to directory that contains the config file.
 	pub crate_dir: PathBuf,
 }
 
@@ -26,6 +31,7 @@ impl Config {
 		Self {
 			download_url: "https://example.com/crates/{crate}/{crate}-{version}.crate".into(),
 			api_url: "https://example.com/".into(),
+			index_dir: "index".into(),
 			crate_dir: "crates".into(),
 		}
 	}

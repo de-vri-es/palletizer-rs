@@ -12,33 +12,25 @@ impl Registry {
 	/// Initialize a new registry with a config file.
 	pub fn init(path: impl AsRef<Path>, config: Config) -> Result<Self, Error> {
 		let path = path.as_ref();
-		let repo = git2::Repository::init(path)
-			.map_err(|e| Error::new(format!("failed to initialize git repository at {}: {}", path.display(), e)))?;
-
-		// Keep track of files to commit.
-		let mut created_files: Vec<PathBuf> = Vec::new();
 
 		// Write Palletizer config file.
+		util::create_dirs(&path)?;
 		util::write_new_file(
 			path.join("Palletizer.toml"),
 			&toml::ser::to_vec(&config).unwrap(),
 		)?;
-		created_files.push("Palletizer.toml".into());
 
-		// Add crate directory to .gitignore if it is a subdir of the repository.
-		if let Ok(rel_crate_dir) = path.join(&config.crate_dir).strip_prefix(path) {
-			util::write_new_file(path.join(".gitignore"), &format!("{}\n", rel_crate_dir.display()))?;
-			created_files.push(rel_crate_dir.into());
-		}
+		// Create the index repository.
+		let index_path = path.join(&config.index_dir);
+		util::create_dirs(&index_path)?;
+		let repo = git2::Repository::init(&index_path)
+			.map_err(|e| Error::new(format!("failed to initialize git repository at {}: {}", path.display(), e)))?;
 
-		// Create webroot with `config.json`.
-		let webroot = path.join("webroot");
-		util::create_dirs(&webroot)?;
-		util::write_new_file(webroot.join("config.json"), config.cargo_json().as_bytes())?;
-		created_files.push("webroot/config.json".into());
+		// Add `config.json`.
+		util::write_new_file(index_path.join("config.json"), config.cargo_json().as_bytes())?;
 
 		// Commit the created files.
-		util::add_commit(&repo, "Initialize empty registry.", &created_files)?;
+		util::add_commit(&repo, "Initialize empty registry index.", &["config.json"])?;
 
 		Ok(Self { config, repo })
 	}
