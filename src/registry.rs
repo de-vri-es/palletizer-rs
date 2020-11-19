@@ -1,4 +1,6 @@
-use crate::{error, util, Config};
+use crate::{index, util, Config};
+use crate::error::Error;
+
 use std::path::{Path, PathBuf};
 
 pub struct Registry {
@@ -8,10 +10,10 @@ pub struct Registry {
 
 impl Registry {
 	/// Initialize a new registry with a config file.
-	pub fn init(path: impl AsRef<Path>, config: Config) -> Result<Self, error::InitRegistryError> {
+	pub fn init(path: impl AsRef<Path>, config: Config) -> Result<Self, Error> {
 		let path = path.as_ref();
 		let repo = git2::Repository::init(path)
-			.map_err(error::InitRegistryError::GitInit)?;
+			.map_err(|e| Error::new(format!("failed to initialize git repository at {}: {}", path.display(), e)))?;
 
 		// Keep track of files to commit.
 		let mut created_files: Vec<PathBuf> = Vec::new();
@@ -36,17 +38,16 @@ impl Registry {
 		created_files.push("webroot/config.json".into());
 
 		// Commit the created files.
-		util::add_commit(&repo, "Initialize empty registry.", &created_files)
-			.map_err(error::InitRegistryError::CommitFailed)?;
+		util::add_commit(&repo, "Initialize empty registry.", &created_files)?;
 
 		Ok(Self { config, repo })
 	}
 
 	/// Open an existing registry.
-	pub fn open(path: impl AsRef<Path>) -> Result<Self, error::OpenRegistryError> {
+	pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
 		let path = path.as_ref();
 		let repo = git2::Repository::open(path)
-			.map_err(error::OpenRegistryError::GitOpen)?;
+			.map_err(|e| Error::new(format!("failed to open git repository at {}: {}", path.display(), e)))?;
 		let config: Config = util::read_toml(path.join("Palletizer.toml"))?;
 		Ok(Self { config, repo })
 	}
@@ -59,7 +60,7 @@ impl Registry {
 	/// Add a crate to the registry.
 	///
 	/// You must pass the path to a crate as packaged by `cargo package`.
-	pub fn add_crate(&mut self, name: &str, version: &str, data: &[u8]) -> Result<(), error::AddCrateError> {
+	pub fn add_crate(&mut self, name: &str, version: &str, data: &[u8]) -> Result<(), Error> {
 		use std::io::Write;
 
 		let index_path_rel = self.index_path_rel(name);
@@ -70,34 +71,30 @@ impl Registry {
 			.append(true)
 			.create(true)
 			.open(&index_path)
-			.map_err(|error| error::ReadIndexError::ReadFailed(error::ReadFailed {
-				path: index_path.clone(),
-				error,
-			}))?;
+			.map_err(|e| Error::new(format!("failed to open {} for writing: {}", index_path.display(), e)))?;
 
 		util::lock_exclusive(&index_file, &index_path)?;
 
 		// Check that the version isn't in the index yet.
 		let index = read_index(&mut index_file, &index_path)?;
-		if index.iter().find(|x| x == &version).is_some() {
-			return Err(error::DuplicateIndexEntry {
-				name: name.to_string(),
-				version: version.to_string(),
-			}.into());
+		if index.iter().find(|x| x.version == version).is_some() {
+			return Err(Error::new(format!("duplicate crate: {}-{} already exists in the index", name, version)));
 		}
+
+		// Extract the manifest.
+		let manifest = crate::manifest::extract(name, version, data)?;
+		println!("{:?}", manifest);
+		todo!();
 
 		// Write the crate file.
 		util::write_new_file(self.crate_path_abs(name, version), data)?;
 
 		// Add the index entry.
-		writeln!(&mut index_file, "{}", version).map_err(|error| error::WriteFailed {
-			path: index_path.into(),
-			error,
-		})?;
+		writeln!(&mut index_file, "{}", version)
+			.map_err(|e| Error::new(format!("failed to write to index file {}: {}", index_path.display(), e)))?;
 
 		// Commit the changes.
-		util::add_commit(&self.repo, &format!("Add {}-{}", name, version), &[index_path_rel])
-			.map_err(error::AddCrateError::CommitFailed)?;
+		util::add_commit(&self.repo, &format!("Add {}-{}", name, version), &[index_path_rel])?;
 
 		Ok(())
 	}
@@ -105,7 +102,7 @@ impl Registry {
 	/// Add a crate to the registry.
 	///
 	/// You must pass the path to a crate as packaged by `cargo package`.
-	pub fn add_crate_from_file(&mut self, path: impl AsRef<Path>) -> Result<(), error::AddCrateFromFileError> {
+	pub fn add_crate_from_file(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
 		let path = path.as_ref();
 		let (name, version) = parse_crate_name(path)?;
 		let data = util::read_file(path)?;
@@ -114,7 +111,7 @@ impl Registry {
 	}
 
 	/// Yank a crate from the registry.
-	pub fn yank_crate(&mut self, name: &str, version: &str) -> Result<(), error::YankCrateError> {
+	pub fn yank_crate(&mut self, name: &str, version: &str) -> Result<(), Error> {
 		todo!()
 	}
 
@@ -140,25 +137,22 @@ impl Registry {
 	}
 }
 
-pub fn read_index<R: std::io::Read>(mut stream: R, path: &Path) -> Result<Vec<String>, error::ReadIndexError> {
+pub fn read_index<R: std::io::Read>(mut stream: R, path: &Path) -> Result<Vec<index::Entry>, Error> {
 	let mut data = Vec::new();
-	stream.read_to_end(&mut data).map_err(|error| error::ReadFailed {
-		path: path.into(),
-		error,
-	})?;
+	stream.read_to_end(&mut data).map_err(|e| Error::new(format!("failed to read from {}: {}", path.display(), e)))?;
 
-	let data = String::from_utf8(data).map_err(|error| error::InvalidUt8File {
-		path: path.into(),
-		error: error.utf8_error(),
-	})?;
-
-	Ok(data.lines().map(String::from).collect())
+	data.split(|&c| c == b'\n')
+		.enumerate()
+		.filter(|(_i, line)| !line.is_empty())
+		.map(|(i, line)| {
+			serde_json::from_slice(line)
+				.map_err(|e| Error::new(format!("failed to parse index entry at {}:{}: {}", path.display(), i, e)))
+		})
+		.collect()
 }
 
-fn parse_crate_name(path: &Path) -> Result<(&str, &str), error::InvalidCrateFileName> {
-	let make_err = || error::InvalidCrateFileName {
-		path: path.into(),
-	};
+fn parse_crate_name(path: &Path) -> Result<(&str, &str), Error> {
+	let make_err = || Error::new(format!("invalid name for crate file, expected \"$name-$version.crate\": {}", path.display()));
 
 	path
 		.file_name()
@@ -178,6 +172,8 @@ trait Rpartition {
 impl Rpartition for str {
 	fn rpartition(&self, split: char) -> Option<(&str, &str)> {
 		let mut parts = self.rsplitn(2, split);
-		Some((parts.next().unwrap(), parts.next()?))
+		let right = parts.next().unwrap();
+		let left = parts.next()?;
+		Some((left, right))
 	}
 }
