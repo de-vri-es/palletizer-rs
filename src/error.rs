@@ -36,6 +36,8 @@ pub enum AddCrateError {
 	#[error("{0}")]
 	ReadIndex(#[from] ReadIndexError),
 	#[error("{0}")]
+	CreateDir(#[from] CreateDirError),
+	#[error("{0}")]
 	LockFailed(#[from] LockFailed),
 	#[error("{0}")]
 	DuplicateIndexEntry(#[from] DuplicateIndexEntry),

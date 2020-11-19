@@ -64,6 +64,7 @@ impl Registry {
 
 		let index_path_rel = self.index_path_rel(name);
 		let index_path = self.path().join(&index_path_rel);
+		util::create_dirs(index_path.parent().unwrap())?;
 		let mut index_file = std::fs::OpenOptions::new()
 			.read(true)
 			.append(true)
