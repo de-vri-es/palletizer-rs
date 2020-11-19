@@ -4,6 +4,7 @@ use crate::error::Error;
 use std::path::{Path, PathBuf};
 
 pub struct Registry {
+	path: PathBuf,
 	config: Config,
 	repo: git2::Repository,
 }
@@ -11,7 +12,7 @@ pub struct Registry {
 impl Registry {
 	/// Initialize a new registry with a config file.
 	pub fn init(path: impl AsRef<Path>, config: Config) -> Result<Self, Error> {
-		let path = path.as_ref();
+		let path = path.as_ref().to_path_buf();
 
 		// Write Palletizer config file.
 		util::create_dirs(&path)?;
@@ -32,21 +33,34 @@ impl Registry {
 		// Commit the created files.
 		util::add_commit(&repo, "Initialize empty registry index.", &["config.json"])?;
 
-		Ok(Self { config, repo })
+		Ok(Self { path, config, repo })
 	}
 
 	/// Open an existing registry.
 	pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
-		let path = path.as_ref();
-		let repo = git2::Repository::open(path)
-			.map_err(|e| Error::new(format!("failed to open git repository at {}: {}", path.display(), e)))?;
+		let path = path.as_ref().to_path_buf();
 		let config: Config = util::read_toml(path.join("Palletizer.toml"))?;
-		Ok(Self { config, repo })
+
+		let index_path = path.join(&config.index_dir);
+
+		let repo = git2::Repository::open(&index_path)
+			.map_err(|e| Error::new(format!("failed to open git repository at {}: {}", index_path.display(), e)))?;
+		Ok(Self { path, config, repo })
 	}
 
 	/// Get the path of the registry.
 	pub fn path(&self) -> &Path {
-		self.repo.workdir().unwrap()
+		&self.path
+	}
+
+	/// Get the path of the index repository.
+	pub fn index_dir(&self) -> PathBuf {
+		self.path.join(&self.config.index_dir)
+	}
+
+	/// Get the path of the crate directory.
+	pub fn crate_dir(&self) -> PathBuf {
+		self.path.join(&self.config.crate_dir)
 	}
 
 	/// Add a crate to the registry.
@@ -56,7 +70,7 @@ impl Registry {
 		use std::io::Write;
 
 		let index_path_rel = self.index_path_rel(name);
-		let index_path = self.path().join(&index_path_rel);
+		let index_path = self.index_dir().join(&index_path_rel);
 		util::create_dirs(index_path.parent().unwrap())?;
 		let mut index_file = std::fs::OpenOptions::new()
 			.read(true)
@@ -124,12 +138,12 @@ impl Registry {
 		file.into()
 	}
 
-	fn crate_path(&self, name: &str, version: &str) -> PathBuf {
+	fn crate_path_rel(&self, name: &str, version: &str) -> PathBuf {
 		self.config.crate_dir.join(format!("{name}/{name}-{version}.crate", name = name, version = version))
 	}
 
 	fn crate_path_abs(&self, name: &str, version: &str) -> PathBuf {
-		self.path().join(&self.crate_path(name, version))
+		self.path().join(&self.crate_path_rel(name, version))
 	}
 }
 
