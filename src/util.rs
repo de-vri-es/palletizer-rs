@@ -89,3 +89,8 @@ pub fn parse_toml<'a, T: serde::Deserialize<'a>>(data: &'a [u8], path: &impl std
 	toml::from_slice(&data)
 		.map_err(|e| Error::new(format!("failed to parse TOML from {}: {}", path, e)))
 }
+
+pub fn compute_sha256_hex(data: impl AsRef<[u8]>) -> String {
+	use sha2::{Digest, Sha256};
+	format!("{:x}", Sha256::digest(data.as_ref()))
+}

@@ -1,4 +1,4 @@
-use crate::{index, util, Config};
+use crate::{index, manifest, util, Config};
 use crate::error::Error;
 
 use std::path::{Path, PathBuf};
@@ -82,15 +82,19 @@ impl Registry {
 		}
 
 		// Extract the manifest.
-		let manifest = crate::manifest::extract(name, version, data)?;
-		println!("{:?}", manifest);
-		todo!();
+		let manifest = manifest::extract(name, version, data)?;
+		let sha256_hexsum = util::compute_sha256_hex(data);
+		let entry = index::Entry::from_manifest(manifest, sha256_hexsum)?;
+		let entry = serde_json::to_string(&entry)
+			.map_err(|e| Error::new(format!("failed to serialize index entry: {}", e)))?;
 
 		// Write the crate file.
-		util::write_new_file(self.crate_path_abs(name, version), data)?;
+		let crate_path = self.crate_path_abs(name, version);
+		util::create_dirs(crate_path.parent().unwrap())?;
+		util::write_new_file(crate_path, data)?;
 
 		// Add the index entry.
-		writeln!(&mut index_file, "{}", version)
+		writeln!(&mut index_file, "{}", entry)
 			.map_err(|e| Error::new(format!("failed to write to index file {}: {}", index_path.display(), e)))?;
 
 		// Commit the changes.
