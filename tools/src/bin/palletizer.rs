@@ -8,9 +8,6 @@ use structopt::clap::AppSettings;
 #[structopt(setting = AppSettings::UnifiedHelpMessage)]
 #[structopt(setting = AppSettings::DeriveDisplayOrder)]
 struct Options {
-	/// The root of of registry to work on.
-	#[structopt(short = "C", long)]
-	root: Option<PathBuf>,
 
 	/// The command to run.
 	#[structopt(subcommand)]
@@ -28,19 +25,27 @@ enum Command {
 #[derive(StructOpt)]
 struct Init {
 	/// The path of the registry to initialize.
-	path: Option<PathBuf>,
+	registry: Option<PathBuf>,
 }
 
 /// Add a crate to the registry.
 #[derive(StructOpt)]
 struct AddCrate {
-	/// The path of the crate.
-	path: PathBuf,
+	/// The root of of registry to work on.
+	#[structopt(long, short)]
+	registry: Option<PathBuf>,
+
+	/// The packaged crate file to add.
+	crate_file: PathBuf,
 }
 
 /// Yank a crate version from the registry.
 #[derive(StructOpt)]
 struct YankCrate {
+	/// The root of of registry to work on.
+	#[structopt(long, short)]
+	registry: Option<PathBuf>,
+
 	/// The name of the crate to yank.
 	name: String,
 
@@ -55,32 +60,33 @@ fn main() {
 }
 
 fn do_main(options: Options) -> Result<(), ()> {
-	let root = options.root.as_deref().unwrap_or(".".as_ref());
 	match &options.command {
-		Command::Init(command) => init(root, command),
-		Command::Add(command) => add_crate(root, command),
-		Command::Yank(command) => yank_crate(root, command),
+		Command::Init(command) => init(command),
+		Command::Add(command) => add_crate(command),
+		Command::Yank(command) => yank_crate(command),
 	}
 }
 
-fn init(root: &Path, command: &Init) -> Result<(), ()> {
-	let path = root.join(command.path.as_deref().unwrap_or(".".as_ref()));
+fn init(command: &Init) -> Result<(), ()> {
+	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
 	let config = palletizer::Config::example();
-	Registry::init(path, &config)
+	Registry::init(registry, config)
 		.map_err(|e| eprintln!("{}", e))
 		.map(drop)
 }
 
-fn add_crate(root: &Path, command: &AddCrate) -> Result<(), ()> {
-	let mut registry = Registry::open(root)
+fn add_crate(command: &AddCrate) -> Result<(), ()> {
+	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let mut registry = Registry::open(registry)
 		.map_err(|e| eprintln!("{}", e))?;
-	registry.add_crate(&command.path)
+	registry.add_crate_from_file(&command.crate_file)
 		.map_err(|e| eprintln!("{}", e))?;
 	Ok(())
 }
 
-fn yank_crate(root: &Path, command: &YankCrate) -> Result<(), ()> {
-	let mut registry = Registry::open(root)
+fn yank_crate(command: &YankCrate) -> Result<(), ()> {
+	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let mut registry = Registry::open(registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.yank_crate(&command.name, &command.version)
 		.map_err(|e| eprintln!("{}", e))?;
