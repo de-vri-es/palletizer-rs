@@ -1,5 +1,5 @@
 use palletizer::Registry;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use structopt::clap::AppSettings;
 
@@ -19,6 +19,7 @@ enum Command {
 	Init(Init),
 	Add(AddCrate),
 	Yank(YankCrate),
+	Unyank(UnyankCrate),
 }
 
 /// Initialize a new registry.
@@ -53,6 +54,20 @@ struct YankCrate {
 	version: String,
 }
 
+/// Unyank a crate version from the registry.
+#[derive(StructOpt)]
+struct UnyankCrate {
+	/// The root of of registry to work on.
+	#[structopt(long, short)]
+	registry: Option<PathBuf>,
+
+	/// The name of the crate to yank.
+	name: String,
+
+	/// The version to yank.
+	version: String,
+}
+
 fn main() {
 	if do_main(Options::from_args()).is_err() {
 		std::process::exit(1);
@@ -64,6 +79,7 @@ fn do_main(options: Options) -> Result<(), ()> {
 		Command::Init(command) => init(command),
 		Command::Add(command) => add_crate(command),
 		Command::Yank(command) => yank_crate(command),
+		Command::Unyank(command) => unyank_crate(command),
 	}
 }
 
@@ -89,6 +105,15 @@ fn yank_crate(command: &YankCrate) -> Result<(), ()> {
 	let mut registry = Registry::open(registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.yank_crate(&command.name, &command.version)
+		.map_err(|e| eprintln!("{}", e))?;
+	Ok(())
+}
+
+fn unyank_crate(command: &UnyankCrate) -> Result<(), ()> {
+	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let mut registry = Registry::open(registry)
+		.map_err(|e| eprintln!("{}", e))?;
+	registry.unyank_crate(&command.name, &command.version)
 		.map_err(|e| eprintln!("{}", e))?;
 	Ok(())
 }
