@@ -15,7 +15,6 @@ impl Registry {
 		let path = path.as_ref().to_path_buf();
 
 		// Write Palletizer config file.
-		util::create_dirs(&path)?;
 		util::write_new_file(
 			path.join("Palletizer.toml"),
 			&toml::ser::to_vec(&config).unwrap(),
@@ -70,19 +69,19 @@ impl Registry {
 		use std::io::Write;
 
 		let index_path_rel = self.index_path_rel(name);
-		let index_path = self.index_dir().join(&index_path_rel);
-		util::create_dirs(index_path.parent().unwrap())?;
+		let index_path_abs = self.index_dir().join(&index_path_rel);
+		util::create_dirs(index_path_abs.parent().unwrap())?;
 		let mut index_file = std::fs::OpenOptions::new()
 			.read(true)
 			.append(true)
 			.create(true)
-			.open(&index_path)
-			.map_err(|e| Error::new(format!("failed to open {} for writing: {}", index_path.display(), e)))?;
+			.open(&index_path_abs)
+			.map_err(|e| Error::new(format!("failed to open {} for writing: {}", index_path_abs.display(), e)))?;
 
-		util::lock_exclusive(&index_file, &index_path)?;
+		util::lock_exclusive(&index_file, &index_path_abs)?;
 
 		// Check that the version isn't in the index yet.
-		let index = read_index(&mut index_file, &index_path)?;
+		let index = read_index(&mut index_file, &index_path_abs)?;
 		if index.iter().find(|x| x.version == version).is_some() {
 			return Err(Error::new(format!("duplicate crate: {}-{} already exists in the index", name, version)));
 		}
@@ -95,13 +94,11 @@ impl Registry {
 			.map_err(|e| Error::new(format!("failed to serialize index entry: {}", e)))?;
 
 		// Write the crate file.
-		let crate_path = self.crate_path_abs(name, version);
-		util::create_dirs(crate_path.parent().unwrap())?;
-		util::write_new_file(crate_path, data)?;
+		util::write_new_file(self.crate_path_abs(name, version), data)?;
 
 		// Add the index entry.
 		writeln!(&mut index_file, "{}", entry)
-			.map_err(|e| Error::new(format!("failed to write to index file {}: {}", index_path.display(), e)))?;
+			.map_err(|e| Error::new(format!("failed to write to index file {}: {}", index_path_abs.display(), e)))?;
 
 		// Commit the changes.
 		util::add_commit(&self.repo, &format!("Add {}-{}", name, version), &[index_path_rel])
@@ -129,7 +126,7 @@ impl Registry {
 	/// If the crate is not found or if an other error occures,
 	/// an error is returned.
 	pub fn yank_crate(&mut self, name: &str, version: &str) -> Result<bool, Error> {
-		let index_path = self.index_dir().join(self.index_path_rel(name));
+		let index_path = self.index_path_abs(name);
 		let mut index_file = util::open_file_read_write(&index_path)?;
 		let mut index = index::read_index(&mut index_file)?;
 
@@ -166,7 +163,7 @@ impl Registry {
 	/// If the crate is not found or if an other error occures,
 	/// an error is returned.
 	pub fn unyank_crate(&mut self, name: &str, version: &str) -> Result<bool, Error> {
-		let index_path = self.index_dir().join(self.index_path_rel(name));
+		let index_path = self.index_path_abs(name);
 		let mut index_file = util::open_file_read_write(&index_path)?;
 		let mut index = index::read_index(&mut index_file)?;
 
@@ -207,6 +204,10 @@ impl Registry {
 		file.make_ascii_lowercase();
 
 		file.into()
+	}
+
+	fn index_path_abs(&self, name: &str) -> PathBuf {
+		self.index_dir().join(self.index_path_rel(name))
 	}
 
 	fn crate_path_rel(&self, name: &str, version: &str) -> PathBuf {
