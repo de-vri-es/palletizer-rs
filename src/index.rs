@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 use serde::{Deserialize, Serialize};
 use crate::error::Error;
 use crate::manifest::{Manifest, Dependency as ManifestDependency};
@@ -41,7 +42,33 @@ pub enum DependencyKind {
 	Dev,
 }
 
+pub fn read_index<R: std::io::Read>(read: R) -> Result<Vec<Entry>, Error> {
+	use std::io::BufRead;
+	let read = std::io::BufReader::new(read);
+	read.lines().map(|line| -> Result<Entry, Error> {
+		let line = line.map_err(|e| Error::new(format!("failed to read index: {}", e)))?;
+		Entry::from_json(&line)
+	}).collect()
+}
+
+pub fn write_index<'a, W: std::io::Write>(mut write: W, path: impl AsRef<Path>, entries: impl IntoIterator<Item = &'a Entry>) -> Result<(), Error> {
+	let path = path.as_ref();
+	for entry in entries.into_iter() {
+		let json = serde_json::to_string(entry)
+			.map_err(|e| Error::new(format!("failed to serialize index entry {}-{}: {}", entry.name, entry.version, e)))?;
+		write.write_all(json.as_bytes())
+			.map_err(|e| Error::new(format!("failed to write to {}: {}", path.display(), e)))?;
+	}
+	write.flush().map_err(|e| Error::new(format!("failed to write to {}: {}", path.display(), e)))?;
+	Ok(())
+}
+
 impl Entry {
+	pub(crate) fn from_json(data: &str) -> Result<Self, Error> {
+		serde_json::from_str(data)
+			.map_err(|e| Error::new(format!("failed to parse index entry: {}", e)))
+	}
+
 	pub(crate) fn from_manifest(manifest: Manifest, checksum_sha256: String) -> Result<Self, Error> {
 		let mut dependencies = Vec::new();
 		add_deps(&mut dependencies, manifest.dependencies, DependencyKind::Normal, None)?;

@@ -122,8 +122,78 @@ impl Registry {
 	}
 
 	/// Yank a crate from the registry.
-	pub fn yank_crate(&mut self, name: &str, version: &str) -> Result<(), Error> {
-		todo!()
+	///
+	/// Returns true if the crate was yanked,
+	/// and false if the crate was already yanked.
+	///
+	/// If the crate is not found or if an other error occures,
+	/// an error is returned.
+	pub fn yank_crate(&mut self, name: &str, version: &str) -> Result<bool, Error> {
+		let index_path = self.index_dir().join(self.index_path_rel(name));
+		let mut index_file = util::open_file_read_write(&index_path)?;
+		let mut index = index::read_index(&mut index_file)?;
+
+		let mut found = 0;
+		let mut yanked = 0;
+		for entry in &mut index {
+			if entry.version == version {
+				found += 1;
+				if !entry.yanked {
+					entry.yanked = true;
+					yanked += 1;
+				}
+			}
+		}
+
+		if found == 0 {
+			return Err(Error::new(format!("failed to yank {}-{}: no such crate in index", name ,version)));
+		}
+
+		if yanked > 0 {
+			util::truncate_file(&mut index_file, &index_path)?;
+			index::write_index(&mut index_file, &index_path, &index)?;
+			Ok(true)
+		} else{
+			Ok(false)
+		}
+	}
+
+	/// Unyank a crate from the registry.
+	///
+	/// Returns true if the crate was unyanked,
+	/// and false if the crate was already unyanked.
+	///
+	/// If the crate is not found or if an other error occures,
+	/// an error is returned.
+	pub fn unyank_crate(&mut self, name: &str, version: &str) -> Result<bool, Error> {
+		let index_path = self.index_dir().join(self.index_path_rel(name));
+		let mut index_file = util::open_file_read_write(&index_path)?;
+		let mut index = index::read_index(&mut index_file)?;
+
+		let mut found = 0;
+		let mut unyanked = 0;
+		for entry in &mut index {
+			if entry.version == version {
+				found += 1;
+				if entry.yanked {
+					entry.yanked = false;
+					unyanked += 1;
+				}
+			}
+		}
+
+		if found == 0 {
+			return Err(Error::new(format!("failed to unyank {}-{}: no such crate in index", name ,version)));
+		}
+
+		if unyanked > 0 {
+			util::truncate_file(&mut index_file, &index_path)?;
+			index::write_index(&mut index_file, &index_path, &index)?;
+			Ok(true)
+		} else{
+			Ok(false)
+		}
+
 	}
 
 	fn index_path_rel(&self, name: &str) -> PathBuf {
