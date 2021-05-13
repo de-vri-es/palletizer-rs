@@ -87,7 +87,7 @@ impl Entry {
 			checksum_sha256,
 			features: manifest.features,
 			yanked: false,
-			links: manifest.links.clone(),
+			links: manifest.links,
 			dependencies,
 		})
 	}

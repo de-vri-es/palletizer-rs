@@ -84,7 +84,7 @@ fn do_main(options: Options) -> Result<(), ()> {
 }
 
 fn init(command: &Init) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
 	let config = palletizer::Config::example();
 	Registry::init(registry, config)
 		.map_err(|e| eprintln!("{}", e))
@@ -92,7 +92,7 @@ fn init(command: &Init) -> Result<(), ()> {
 }
 
 fn add_crate(command: &AddCrate) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
 	let mut registry = Registry::open(registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.add_crate_from_file(&command.crate_file)
@@ -101,7 +101,7 @@ fn add_crate(command: &AddCrate) -> Result<(), ()> {
 }
 
 fn yank_crate(command: &YankCrate) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
 	let mut registry = Registry::open(registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.yank_crate(&command.name, &command.version)
@@ -110,7 +110,7 @@ fn yank_crate(command: &YankCrate) -> Result<(), ()> {
 }
 
 fn unyank_crate(command: &UnyankCrate) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or(".".as_ref());
+	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
 	let mut registry = Registry::open(registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.unyank_crate(&command.name, &command.version)

@@ -82,7 +82,7 @@ impl Registry {
 
 		// Check that the version isn't in the index yet.
 		let index = read_index(&mut index_file, &index_path_abs)?;
-		if index.iter().find(|x| x.version == version).is_some() {
+		if index.iter().any(|x| x.version == version) {
 			return Err(Error::new(format!("duplicate crate: {}-{} already exists in the index", name, version)));
 		}
 
@@ -193,6 +193,7 @@ impl Registry {
 
 	}
 
+	#[allow(clippy::match_ref_pats)]
 	fn index_path_rel(&self, name: &str) -> PathBuf {
 		let mut file = match name.as_bytes() {
 			&[] => panic!("empty crate names are not supported"),
@@ -202,7 +203,6 @@ impl Registry {
 			&[a, b, c, d, ..] => format!("{}{}/{}{}/{}", a as char, b as char, c as char, d as char, name),
 		};
 		file.make_ascii_lowercase();
-
 		file.into()
 	}
 

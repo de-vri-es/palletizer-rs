@@ -47,10 +47,10 @@ pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Pa
 		let staged = repo.diff_tree_to_index(Some(&head_tree), Some(&index), None)
 			.map_err(|e| Error::new(format!("failed to compare tree with index: {}", e)))?;
 		if staged.deltas().next().is_some() {
-			return Err(Error::new(format!("index already contains staged changes")));
+			return Err(Error::new("index already contains staged changes".into()));
 		}
 	} else if !index.is_empty() {
-		return Err(Error::new(format!("index already contains staged changes")));
+		return Err(Error::new("index already contains staged changes".into()));
 	}
 
 	// Add the files to the index.
