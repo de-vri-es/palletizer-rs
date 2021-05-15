@@ -62,13 +62,14 @@ impl Registry {
 		self.path.join(&self.config.crate_dir)
 	}
 
-	/// Add a crate to the registry.
-	///
-	/// You must pass the path to a crate as packaged by `cargo package`.
-	pub fn add_crate(&mut self, name: &str, version: &str, data: &[u8]) -> Result<(), Error> {
+	/// Add a crate to the registry using the supplied metadata.
+	pub fn add_crate_with_metadata(&mut self, metadata: &index::Entry, data: &[u8]) -> Result<(), Error> {
 		use std::io::Write;
 
-		let index_path_rel = self.index_path_rel(name);
+		let metadata_json = serde_json::to_string(&metadata)
+			.map_err(|e| Error::new(format!("failed to serialize index metadata: {}", e)))?;
+
+		let index_path_rel = self.index_path_rel(&metadata.name);
 		let index_path_abs = self.index_dir().join(&index_path_rel);
 		util::create_dirs(index_path_abs.parent().unwrap())?;
 		let mut index_file = std::fs::OpenOptions::new()
@@ -82,26 +83,19 @@ impl Registry {
 
 		// Check that the version isn't in the index yet.
 		let index = read_index(&mut index_file, &index_path_abs)?;
-		if index.iter().any(|x| x.version == version) {
-			return Err(Error::new(format!("duplicate crate: {}-{} already exists in the index", name, version)));
+		if index.iter().any(|x| x.version == metadata.version) {
+			return Err(Error::new(format!("duplicate crate: {}-{} already exists in the index", metadata.name, metadata.version)));
 		}
 
-		// Extract the manifest.
-		let manifest = manifest::extract(name, version, data)?;
-		let sha256_hexsum = util::compute_sha256_hex(data);
-		let entry = index::Entry::from_manifest(manifest, sha256_hexsum)?;
-		let entry = serde_json::to_string(&entry)
-			.map_err(|e| Error::new(format!("failed to serialize index entry: {}", e)))?;
-
 		// Write the crate file.
-		util::write_new_file(self.crate_path_abs(name, version), data)?;
+		util::write_new_file(self.crate_path_abs(&metadata.name, &metadata.version), data)?;
 
 		// Add the index entry.
-		writeln!(&mut index_file, "{}", entry)
+		writeln!(&mut index_file, "{}", &metadata_json)
 			.map_err(|e| Error::new(format!("failed to write to index file {}: {}", index_path_abs.display(), e)))?;
 
 		// Commit the changes.
-		util::add_commit(&self.repo, &format!("Add {}-{}", name, version), &[index_path_rel])
+		util::add_commit(&self.repo, &format!("Add {}-{}", metadata.name, metadata.version), &[index_path_rel])
 			.map_err(|e| Error::new(format!("failed to commit changes: {}", e)))?;
 
 		Ok(())
@@ -110,12 +104,21 @@ impl Registry {
 	/// Add a crate to the registry.
 	///
 	/// You must pass the path to a crate as packaged by `cargo package`.
+	pub fn add_crate(&mut self, data: &[u8]) -> Result<(), Error> {
+		// Extract the manifest.
+		let manifest = manifest::extract(data)?;
+		let sha256_hexsum = util::compute_sha256_hex(data);
+		let metadata = index::Entry::from_manifest(manifest, sha256_hexsum)?;
+
+		self.add_crate_with_metadata(&metadata, data)
+	}
+
+	/// Add a crate to the registry.
+	///
+	/// You must pass the path to a crate as packaged by `cargo package`.
 	pub fn add_crate_from_file(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-		let path = path.as_ref();
-		let (name, version) = parse_crate_name(path)?;
-		let data = util::read_file(path)?;
-		self.add_crate(name, version, &data)?;
-		Ok(())
+		let data = util::read_file(path.as_ref())?;
+		self.add_crate(&data)
 	}
 
 	/// Yank a crate from the registry.
@@ -231,20 +234,6 @@ pub fn read_index<R: std::io::Read>(mut stream: R, path: &Path) -> Result<Vec<in
 				.map_err(|e| Error::new(format!("failed to parse index entry at {}:{}: {}", path.display(), i, e)))
 		})
 		.collect()
-}
-
-fn parse_crate_name(path: &Path) -> Result<(&str, &str), Error> {
-	let make_err = || Error::new(format!("invalid name for crate file, expected \"$name-$version.crate\": {}", path.display()));
-
-	path
-		.file_name()
-		.ok_or_else(make_err)?
-		.to_str()
-		.ok_or_else(make_err)?
-		.strip_suffix(".crate")
-		.ok_or_else(make_err)?
-		.rpartition('-')
-		.ok_or_else(make_err)
 }
 
 trait Rpartition {

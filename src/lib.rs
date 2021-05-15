@@ -1,5 +1,5 @@
 mod config;
-mod index;
+pub mod index;
 mod registry;
 mod util;
 pub mod error;

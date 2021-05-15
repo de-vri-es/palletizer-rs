@@ -2,7 +2,6 @@ use libflate::gzip;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::Read;
-use std::path::Path;
 
 use crate::error::Error;
 
@@ -53,8 +52,7 @@ pub struct Dependency {
 
 fn default_true() -> bool { true }
 
-fn extract_file<P: AsRef<Path>, R: Read>(path: P, archive: R) -> Result<Option<Vec<u8>>, Error> {
-	let path = path.as_ref();
+pub fn extract<R: Read>(archive: R) -> Result<Manifest, Error> {
 	let mut archive = archive;
 	let archive = gzip::Decoder::new(&mut archive)
 		.map_err(|e| Error::new(format!("failed to initialize gzip decoder: {}", e)))?;
@@ -65,22 +63,18 @@ fn extract_file<P: AsRef<Path>, R: Read>(path: P, archive: R) -> Result<Option<V
 	for file in entries {
 		let mut file = file.map_err(|e| Error::new(format!("failed to read archive entry header: {}", e)))?;
 		let entry_path = file.path()
-			.map_err(|e| Error::new(format!("acrhive entry contains non-UTF8 path: {}", e)))?;
+			.map_err(|e| Error::new(format!("acrhive entry contains non-UTF8 path: {}", e)))?
+			.to_path_buf();
 
-		if entry_path == path {
+		if entry_path.components().count() == 2 && entry_path.ends_with("Cargo.toml") {
 			let mut data = Vec::new();
 			file.read_to_end(&mut data)
-				.map_err(|e| Error::new(format!("failed to read archive data for {}: {}", path.display(), e)))?;
-			return Ok(Some(data))
+				.map_err(|e| Error::new(format!("failed to read archive data for {}: {}", entry_path.display(), e)))?;
+			let manifest = toml::from_slice(&data)
+				.map_err(|e| Error::new(format!("failed to parse manifest from archive: {}: {}", entry_path.display(), e)))?;
+			return Ok(manifest)
 		}
 	}
 
-	Ok(None)
-}
-
-pub fn extract<R: Read>(name: &str, version: &str, archive: R) -> Result<Manifest, Error> {
-	let manifest_path = format!("{}-{}/Cargo.toml", name, version);
-	let data = extract_file(&manifest_path, archive)?
-		.ok_or_else(|| Error::new(format!("failed to find {} in package archive", manifest_path)))?;
-	Ok(toml::from_slice(&data).unwrap())
+	Err(Error::new("failed to find manifest in archive".into()))
 }
