@@ -19,4 +19,4 @@ thiserror = "1.0.22"
 toml = "0.5.7"
 
 [workspace]
-members = ["tools"]
+members = ["server", "tools"]

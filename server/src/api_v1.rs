@@ -1,0 +1,175 @@
+use hyper::header;
+use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock};
+
+use crate::Registry;
+use crate::server::{self, Request, Response, HttpError};
+
+pub async fn handle_request(registry: Arc<RwLock<Registry>>, request: Request, api_path: &str) -> Result<Response, HttpError> {
+	if let Some(api_path) = api_path.strip_prefix("crates/") {
+		handle_crate_request(registry, request, api_path).await
+	} else {
+		server::not_found()
+	}
+}
+
+async fn handle_crate_request(registry: Arc<RwLock<Registry>>, request: Request, api_path: &str) -> Result<Response, HttpError> {
+	if api_path == "new" {
+		publish_crate(registry, request).await
+	} else {
+		let (name, rest) = match api_path.split_once('/') {
+			Some(x) => x,
+			None => return server::not_found(),
+		};
+		let (version, action) = match rest.split_once('/') {
+			Some(x) => x,
+			None => return server::not_found(),
+		};
+		match action {
+			"yank" => yank_crate(registry, name, version),
+			"unyank" => unyank_crate(registry, name, version),
+			_ => server::not_found()
+		}
+	}
+}
+
+async fn publish_crate(registry: Arc<RwLock<Registry>>, request: Request) -> Result<Response, HttpError> {
+	use sha2::Digest;
+
+	let body = match server::collect_body(request.into_body()).await {
+		Ok(x) => x,
+		Err(e) => {
+			log::error!("Failed to read request body: {}", e);
+			return server::internal_server_error("Failed to read response body");
+		}
+	};
+
+	let (metadata, crate_data) = match parse_crate(&body) {
+		Ok(x) => x,
+		Err(e) => {
+			log::error!("Failed to parse request body: {}", e);
+			return error_response(e);
+		}
+	};
+
+	let crate_sha256 = format!("{:x}", sha2::Sha256::digest(crate_data));
+	let index_entry = metadata.into_index_entry(crate_sha256);
+
+	let mut registry = registry.write().unwrap();
+	match registry.add_crate_with_metadata(&index_entry, crate_data) {
+		Ok(()) => (),
+		Err(e) => {
+			log::error!("Failed to publish crate {}-{}: {}", index_entry.name, index_entry.version, e);
+			return error_response(e);
+		},
+	}
+
+	log::info!("Published {}-{} with sha256 checksum {}", index_entry.name, index_entry.version, index_entry.checksum_sha256);
+	json_response("{\"warnings\":{\"invalid_categories\":[],\"invalid_badges\":[],\"other\":[]}}")
+}
+
+#[derive(serde::Deserialize)]
+struct NewCrateMeta {
+	name: String,
+
+	#[serde(rename = "vers")]
+	version: String,
+
+	#[serde(rename = "deps")]
+	dependencies: Vec<palletizer::index::Dependency>,
+
+	features: BTreeMap<String, Vec<String>>,
+
+	links: Option<String>
+
+	// Other fields ignored, because not needed for the index.
+}
+
+impl NewCrateMeta {
+	fn into_index_entry(self, crate_sha256: String) -> palletizer::index::Entry {
+		palletizer::index::Entry {
+			name: self.name,
+			version: self.version,
+			dependencies: self.dependencies,
+			features: self.features,
+			checksum_sha256: crate_sha256,
+			yanked: false,
+			links: self.links,
+		}
+	}
+}
+
+fn parse_crate(data: &[u8]) -> Result<(NewCrateMeta, &[u8]), String> {
+	if data.len() < 4 {
+		return Err("missing metadata JSON length".into());
+	}
+
+	let json_len = usize::from(data[0]) + (usize::from(data[1])<< 8) + (usize::from(data[2]) << 16) + (usize::from(data[3]) << 24);
+	let data = &data[4..];
+
+	if data.len() < json_len {
+		return Err(format!("expected {} bytes of metadata, got only {} bytes remaining", json_len, data.len()));
+	}
+
+	let (json, data) = data.split_at(json_len);
+
+	if data.len() < 4 {
+		return Err("missing crate tarball length".into());
+	}
+	let tarball_len = usize::from(data[0]) + (usize::from(data[1])<< 8) + (usize::from(data[2]) << 16) + (usize::from(data[3]) << 24);
+	let tarball = &data[4..];
+
+	if tarball.len() != tarball_len {
+		return Err(format!("expected {} exactly bytes of crate tarball, got {} bytes remaining", tarball_len, tarball.len()));
+	}
+
+	let meta = serde_json::from_slice(json)
+		.map_err(|e| format!("failed to parse crate metadata: {}", e))?;
+
+	Ok((meta, tarball))
+}
+
+fn yank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str) -> Result<Response, HttpError> {
+	let mut registry = registry.write().unwrap();
+	if let Err(e) = registry.yank_crate(name, version) {
+		error_response(e)
+	} else {
+		json_response("{\"warnings\":[]}")
+	}
+}
+
+fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str) -> Result<Response, HttpError> {
+	let mut registry = registry.write().unwrap();
+	if let Err(e) = registry.unyank_crate(name, version) {
+		error_response(e)
+	} else {
+		json_response("{\"warnings\":[]}")
+	}
+}
+
+fn error_response(message: impl std::fmt::Display) -> Result<Response, HttpError> {
+	#[derive(serde::Serialize)]
+	struct ErrorResponse {
+		errors: Vec<Error>,
+	}
+
+	#[derive(serde::Serialize)]
+	struct Error {
+		detail: String,
+	}
+
+	let response = ErrorResponse {
+		errors: vec![
+			Error { detail: message.to_string() },
+		],
+	};
+
+	let body = serde_json::to_vec(&response).unwrap();
+	json_response(body)
+}
+
+fn json_response(json: impl Into<hyper::Body>) -> Result<Response, HttpError> {
+	hyper::Response::builder()
+		.header(header::CONTENT_TYPE, "application/json")
+		.body(json.into())
+}
