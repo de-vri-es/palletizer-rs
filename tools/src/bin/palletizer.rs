@@ -8,7 +8,6 @@ use structopt::clap::AppSettings;
 #[structopt(setting = AppSettings::UnifiedHelpMessage)]
 #[structopt(setting = AppSettings::DeriveDisplayOrder)]
 struct Options {
-
 	/// The command to run.
 	#[structopt(subcommand)]
 	command: Command,
@@ -26,7 +25,9 @@ enum Command {
 #[derive(StructOpt)]
 struct Init {
 	/// The path of the registry to initialize.
-	registry: Option<PathBuf>,
+	#[structopt(long, short)]
+	#[structopt(default_value = ".")]
+	registry: PathBuf,
 }
 
 /// Add a crate to the registry.
@@ -34,7 +35,8 @@ struct Init {
 struct AddCrate {
 	/// The root of of registry to work on.
 	#[structopt(long, short)]
-	registry: Option<PathBuf>,
+	#[structopt(default_value = ".")]
+	registry: PathBuf,
 
 	/// The packaged crate file to add.
 	crate_file: PathBuf,
@@ -45,7 +47,8 @@ struct AddCrate {
 struct YankCrate {
 	/// The root of of registry to work on.
 	#[structopt(long, short)]
-	registry: Option<PathBuf>,
+	#[structopt(default_value = ".")]
+	registry: PathBuf,
 
 	/// The name of the crate to yank.
 	name: String,
@@ -59,7 +62,8 @@ struct YankCrate {
 struct UnyankCrate {
 	/// The root of of registry to work on.
 	#[structopt(long, short)]
-	registry: Option<PathBuf>,
+	#[structopt(default_value = ".")]
+	registry: PathBuf,
 
 	/// The name of the crate to yank.
 	name: String,
@@ -84,16 +88,14 @@ fn do_main(options: Options) -> Result<(), ()> {
 }
 
 fn init(command: &Init) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
 	let config = palletizer::Config::example();
-	Registry::init(registry, config)
+	Registry::init(&command.registry, config)
 		.map_err(|e| eprintln!("{}", e))
 		.map(drop)
 }
 
 fn add_crate(command: &AddCrate) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
-	let mut registry = Registry::open(registry)
+	let mut registry = Registry::open(&command.registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.add_crate_from_file(&command.crate_file)
 		.map_err(|e| eprintln!("{}", e))?;
@@ -101,8 +103,7 @@ fn add_crate(command: &AddCrate) -> Result<(), ()> {
 }
 
 fn yank_crate(command: &YankCrate) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
-	let mut registry = Registry::open(registry)
+	let mut registry = Registry::open(&command.registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.yank_crate(&command.name, &command.version)
 		.map_err(|e| eprintln!("{}", e))?;
@@ -110,8 +111,7 @@ fn yank_crate(command: &YankCrate) -> Result<(), ()> {
 }
 
 fn unyank_crate(command: &UnyankCrate) -> Result<(), ()> {
-	let registry = command.registry.as_deref().unwrap_or_else(|| ".".as_ref());
-	let mut registry = Registry::open(registry)
+	let mut registry = Registry::open(&command.registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.unyank_crate(&command.name, &command.version)
 		.map_err(|e| eprintln!("{}", e))?;
