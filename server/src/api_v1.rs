@@ -1,4 +1,4 @@
-use hyper::header;
+use hyper::{header, Method};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
@@ -26,8 +26,8 @@ async fn handle_crate_request(registry: Arc<RwLock<Registry>>, request: Request,
 			None => return server::not_found(),
 		};
 		match action {
-			"yank" => yank_crate(registry, name, version),
-			"unyank" => unyank_crate(registry, name, version),
+			"yank" => yank_crate(registry, name, version, request.method()),
+			"unyank" => unyank_crate(registry, name, version, request.method()),
 			_ => server::not_found()
 		}
 	}
@@ -35,6 +35,10 @@ async fn handle_crate_request(registry: Arc<RwLock<Registry>>, request: Request,
 
 async fn publish_crate(registry: Arc<RwLock<Registry>>, request: Request) -> Result<Response, HttpError> {
 	use sha2::Digest;
+
+	if let Some(response) = server::check_supported_method(request.method(), &[Method::PUT]) {
+		return response;
+	}
 
 	let body = match server::collect_body(request.into_body()).await {
 		Ok(x) => x,
@@ -129,7 +133,11 @@ fn parse_crate(data: &[u8]) -> Result<(NewCrateMeta, &[u8]), String> {
 	Ok((meta, tarball))
 }
 
-fn yank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str) -> Result<Response, HttpError> {
+fn yank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, method: &Method) -> Result<Response, HttpError> {
+	if let Some(response) = server::check_supported_method(method, &[Method::DELETE]) {
+		return response;
+	}
+
 	let mut registry = registry.write().unwrap();
 	if let Err(e) = registry.yank_crate(name, version) {
 		error_response(e)
@@ -138,7 +146,11 @@ fn yank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str) -> Res
 	}
 }
 
-fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str) -> Result<Response, HttpError> {
+fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, method: &Method) -> Result<Response, HttpError> {
+	if let Some(response) = server::check_supported_method(method, &[Method::PUT]) {
+		return response;
+	}
+
 	let mut registry = registry.write().unwrap();
 	if let Err(e) = registry.unyank_crate(name, version) {
 		error_response(e)
