@@ -39,6 +39,7 @@ fn get_crate(registry: Arc<RwLock<Registry>>, path: &str, method: &Method) -> Re
 	};
 
 	let response = hyper::Response::builder()
+		.header(header::CACHE_CONTROL, "private") //TODO: Allow for a config option to make this public.
 		.header(header::CONTENT_TYPE, "application/gzip");
 
 	if method == Method::GET {
@@ -48,20 +49,25 @@ fn get_crate(registry: Arc<RwLock<Registry>>, path: &str, method: &Method) -> Re
 	}
 }
 
-pub fn not_found() -> Result<Response, HttpError> {
+pub fn response_no_cache() -> hyper::http::response::Builder {
 	hyper::Response::builder()
+		.header(header::CACHE_CONTROL, "no-store")
+}
+
+pub fn not_found() -> Result<Response, HttpError> {
+	response_no_cache()
 		.status(StatusCode::NOT_FOUND)
 		.body("Not Found".into())
 }
 
 pub fn unauthorized() -> Result<Response, HttpError> {
-	hyper::Response::builder()
+	response_no_cache()
 		.status(StatusCode::UNAUTHORIZED)
 		.body("Unauthorized".into())
 }
 
 pub fn internal_server_error(message: impl std::fmt::Display) -> Result<Response, HttpError> {
-	hyper::Response::builder()
+	response_no_cache()
 		.status(StatusCode::INTERNAL_SERVER_ERROR)
 		.body(message.to_string().into())
 }

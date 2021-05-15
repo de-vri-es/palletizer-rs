@@ -181,7 +181,7 @@ fn error_response(message: impl std::fmt::Display) -> Result<Response, HttpError
 }
 
 fn json_response(json: impl Into<hyper::Body>) -> Result<Response, HttpError> {
-	hyper::Response::builder()
+	server::response_no_cache()
 		.header(header::CONTENT_TYPE, "application/json")
 		.body(json.into())
 }
