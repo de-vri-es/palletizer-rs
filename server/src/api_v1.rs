@@ -140,9 +140,11 @@ fn yank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, method
 
 	let mut registry = registry.write().unwrap();
 	if let Err(e) = registry.yank_crate(name, version) {
+		log::info!("Failed to yank {}-{}: {}", name, version, e);
 		error_response(e)
 	} else {
-		json_response("{\"warnings\":[]}")
+		log::info!("Yanked {}-{}", name, version);
+		json_response("{\"ok\":true}")
 	}
 }
 
@@ -153,9 +155,11 @@ fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, meth
 
 	let mut registry = registry.write().unwrap();
 	if let Err(e) = registry.unyank_crate(name, version) {
+		log::info!("Failed to unyank {}-{}: {}", name, version, e);
 		error_response(e)
 	} else {
-		json_response("{\"warnings\":[]}")
+		log::info!("Unyanked {}-{}", name, version);
+		json_response("{\"ok\":true}")
 	}
 }
 
