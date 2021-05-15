@@ -204,7 +204,7 @@ impl Registry {
 			index::write_index(&mut index_file, &index_path_abs, &index)?;
 
 			// Commit the changes.
-			util::add_commit(&self.repo, &format!("Yanked {}-{}", name, version), &[index_path_rel])
+			util::add_commit(&self.repo, &format!("Unyanked {}-{}", name, version), &[index_path_rel])
 				.map_err(|e| Error::new(format!("failed to commit changes: {}", e)))?;
 			Ok(true)
 		} else{
