@@ -9,6 +9,13 @@ pub struct Registry {
 	repo: git2::Repository,
 }
 
+// I think read-only access from multiple threads is fine.
+//
+// Without this, an Arc<RwLock<Registry>> would not be Send,
+// meaning we would always need to use a mutex.
+// It would be a waste to unnecessarily serialize read-only access to the index repo.
+unsafe impl Sync for Registry {}
+
 impl Registry {
 	/// Initialize a new registry with a config file.
 	pub fn init(path: impl AsRef<Path>, config: Config) -> Result<Self, Error> {
