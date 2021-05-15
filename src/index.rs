@@ -58,6 +58,8 @@ pub fn write_index<'a, W: std::io::Write>(mut write: W, path: impl AsRef<Path>, 
 			.map_err(|e| Error::new(format!("failed to serialize index entry {}-{}: {}", entry.name, entry.version, e)))?;
 		write.write_all(json.as_bytes())
 			.map_err(|e| Error::new(format!("failed to write to {}: {}", path.display(), e)))?;
+		write.write_all(b"\n")
+			.map_err(|e| Error::new(format!("failed to write to {}: {}", path.display(), e)))?;
 	}
 	write.flush().map_err(|e| Error::new(format!("failed to write to {}: {}", path.display(), e)))?;
 	Ok(())
