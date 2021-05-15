@@ -139,12 +139,19 @@ fn yank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, method
 	}
 
 	let mut registry = registry.write().unwrap();
-	if let Err(e) = registry.yank_crate(name, version) {
-		log::info!("Failed to yank {}-{}: {}", name, version, e);
-		error_response(e)
-	} else {
-		log::info!("Yanked {}-{}", name, version);
-		json_response("{\"ok\":true}")
+	match registry.yank_crate(name, version) {
+		Err(e) => {
+			log::info!("Failed to yank {}-{}: {}", name, version, e);
+			error_response(e)
+		},
+		Ok(true) => {
+			log::info!("Yanked {}-{}", name, version);
+			json_response("{\"ok\":true}")
+		},
+		Ok(false) => {
+			log::info!("Ignored yank request for {}-{} (already yanked)", name, version);
+			json_response("{\"ok\":true}")
+		},
 	}
 }
 
@@ -154,12 +161,19 @@ fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, meth
 	}
 
 	let mut registry = registry.write().unwrap();
-	if let Err(e) = registry.unyank_crate(name, version) {
-		log::info!("Failed to unyank {}-{}: {}", name, version, e);
-		error_response(e)
-	} else {
-		log::info!("Unyanked {}-{}", name, version);
-		json_response("{\"ok\":true}")
+	match registry.unyank_crate(name, version) {
+		Err(e) => {
+			log::info!("Failed to yank {}-{}: {}", name, version, e);
+			error_response(e)
+		},
+		Ok(true) => {
+			log::info!("Unyanked {}-{}", name, version);
+			json_response("{\"ok\":true}")
+		},
+		Ok(false) => {
+			log::info!("Ignored unyank request for {}-{} (not yanked)", name, version);
+			json_response("{\"ok\":true}")
+		},
 	}
 }
 
