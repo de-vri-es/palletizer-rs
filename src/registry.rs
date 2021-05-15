@@ -136,8 +136,9 @@ impl Registry {
 	/// If the crate is not found or if an other error occures,
 	/// an error is returned.
 	pub fn yank_crate(&mut self, name: &str, version: &str) -> Result<bool, Error> {
-		let index_path = self.index_path_abs(name);
-		let mut index_file = util::open_file_read_write(&index_path)?;
+		let index_path_rel = self.index_path_rel(name);
+		let index_path_abs = self.index_dir().join(&index_path_rel);
+		let mut index_file = util::open_file_read_write(&index_path_abs)?;
 		let mut index = index::read_index(&mut index_file)?;
 
 		let mut found = 0;
@@ -157,8 +158,12 @@ impl Registry {
 		}
 
 		if yanked > 0 {
-			util::truncate_file(&mut index_file, &index_path)?;
-			index::write_index(&mut index_file, &index_path, &index)?;
+			util::truncate_file(&mut index_file, &index_path_abs)?;
+			index::write_index(&mut index_file, &index_path_abs, &index)?;
+
+			// Commit the changes.
+			util::add_commit(&self.repo, &format!("Yanked {}-{}", name, version), &[index_path_rel])
+				.map_err(|e| Error::new(format!("failed to commit changes: {}", e)))?;
 			Ok(true)
 		} else{
 			Ok(false)
@@ -173,8 +178,9 @@ impl Registry {
 	/// If the crate is not found or if an other error occures,
 	/// an error is returned.
 	pub fn unyank_crate(&mut self, name: &str, version: &str) -> Result<bool, Error> {
-		let index_path = self.index_path_abs(name);
-		let mut index_file = util::open_file_read_write(&index_path)?;
+		let index_path_rel = self.index_path_rel(name);
+		let index_path_abs = self.index_dir().join(&index_path_rel);
+		let mut index_file = util::open_file_read_write(&index_path_abs)?;
 		let mut index = index::read_index(&mut index_file)?;
 
 		let mut found = 0;
@@ -194,8 +200,12 @@ impl Registry {
 		}
 
 		if unyanked > 0 {
-			util::truncate_file(&mut index_file, &index_path)?;
-			index::write_index(&mut index_file, &index_path, &index)?;
+			util::truncate_file(&mut index_file, &index_path_abs)?;
+			index::write_index(&mut index_file, &index_path_abs, &index)?;
+
+			// Commit the changes.
+			util::add_commit(&self.repo, &format!("Yanked {}-{}", name, version), &[index_path_rel])
+				.map_err(|e| Error::new(format!("failed to commit changes: {}", e)))?;
 			Ok(true)
 		} else{
 			Ok(false)
@@ -214,10 +224,6 @@ impl Registry {
 		};
 		file.make_ascii_lowercase();
 		file.into()
-	}
-
-	fn index_path_abs(&self, name: &str) -> PathBuf {
-		self.index_dir().join(self.index_path_rel(name))
 	}
 
 	fn crate_path_rel(&self, name: &str, version: &str) -> PathBuf {
