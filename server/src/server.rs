@@ -9,13 +9,14 @@ pub type Request = hyper::Request<hyper::Body>;
 pub type Response = hyper::Response<hyper::Body>;
 
 pub async fn handle_request(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, request: Request) -> Result<Response, HttpError> {
-	if let Some(path) = request.uri().path().strip_prefix("/crates/") {
+	let path = request.uri().path().replace("//", "/");
+	if let Some(path) = path.strip_prefix("/crates/") {
 		get_crate(registry, path, request.method())
-	} else if let Some(api_path) = request.uri().path().strip_prefix("/api/v1/").map(|x| x.to_owned()) {
+	} else if let Some(api_path) = path.strip_prefix("/api/v1/") {
 		api_v1::handle_request(registry, request, &api_path).await
-	} else if let Some(path) = request.uri().path().strip_prefix("/index.git/").map(|x| x.to_owned()) {
+	} else if let Some(path) = path.strip_prefix("/index.git/") {
 		git::handle_request(&index_repo_path, request, &path).await
-	} else if let Some(path) = request.uri().path().strip_prefix("/index/").map(|x| x.to_owned()) {
+	} else if let Some(path) = path.strip_prefix("/index/") {
 		git::handle_request(&index_repo_path, request, &path).await
 	} else {
 		not_found()
