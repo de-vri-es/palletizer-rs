@@ -30,7 +30,7 @@ impl Config {
 	pub fn example() -> Self {
 		Self {
 			download_url: "https://example.com/crates/{crate}/{crate}-{version}.crate".into(),
-			api_url: "https://example.com/".into(),
+			api_url: "https://example.com".into(),
 			index_dir: "index".into(),
 			crate_dir: "crates".into(),
 		}
