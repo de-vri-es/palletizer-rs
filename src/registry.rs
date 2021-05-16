@@ -59,6 +59,11 @@ impl Registry {
 		&self.path
 	}
 
+	/// Get the git repository of the index.
+	pub fn index_repo(&self) -> &git2::Repository {
+		&self.repo
+	}
+
 	/// Get the path of the index repository.
 	pub fn index_dir(&self) -> PathBuf {
 		self.path.join(&self.config.index_dir)

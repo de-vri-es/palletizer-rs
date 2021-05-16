@@ -1,17 +1,22 @@
 use palletizer::Registry;
 use std::sync::{Arc, RwLock};
+use std::path::PathBuf;
 use hyper::{header, StatusCode, Method};
-use crate::api_v1;
+use crate::{api_v1, git};
 
 pub use hyper::http::Error as HttpError;
 pub type Request = hyper::Request<hyper::Body>;
 pub type Response = hyper::Response<hyper::Body>;
 
-pub async fn handle_request(registry: Arc<RwLock<Registry>>, request: Request) -> Result<Response, HttpError> {
+pub async fn handle_request(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, request: Request) -> Result<Response, HttpError> {
 	if let Some(path) = request.uri().path().strip_prefix("/crates/") {
 		get_crate(registry, path, request.method())
 	} else if let Some(api_path) = request.uri().path().strip_prefix("/api/v1/").map(|x| x.to_owned()) {
 		api_v1::handle_request(registry, request, &api_path).await
+	} else if let Some(path) = request.uri().path().strip_prefix("/index.git/").map(|x| x.to_owned()) {
+		git::handle_request(&index_repo_path, request, &path).await
+	} else if let Some(path) = request.uri().path().strip_prefix("/index/").map(|x| x.to_owned()) {
+		git::handle_request(&index_repo_path, request, &path).await
 	} else {
 		not_found()
 	}

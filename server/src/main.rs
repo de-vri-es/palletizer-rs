@@ -4,8 +4,9 @@ use std::sync::{Arc, RwLock};
 use structopt::StructOpt;
 use structopt::clap::AppSettings;
 
-mod logging;
 mod api_v1;
+mod git;
+mod logging;
 mod server;
 
 #[derive(StructOpt)]
@@ -40,6 +41,7 @@ fn main() {
 fn do_main(options: Options) -> Result<(), ()> {
 	let registry = Registry::open(&options.registry)
 		.map_err(|e| log::error!("{}", e))?;
+	let index_repo_path = registry.index_dir();
 	let registry = Arc::new(RwLock::new(registry));
 
 	let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -47,10 +49,10 @@ fn do_main(options: Options) -> Result<(), ()> {
 		.build()
 		.map_err(|e| log::error!("Failed to initialize I/O runtime: {}", e))?;
 
-	runtime.block_on(run_server(registry, options))
+	runtime.block_on(run_server(registry, index_repo_path, options))
 }
 
-async fn run_server(registry: Arc<RwLock<Registry>>, options: Options) -> Result<(), ()> {
+async fn run_server(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, options: Options) -> Result<(), ()> {
 	let listener = tokio::net::TcpListener::bind(&options.bind)
 		.await
 		.map_err(|e| log::error!("Failed to listen on {}: {}", &options.bind, e))?;
@@ -63,12 +65,19 @@ async fn run_server(registry: Arc<RwLock<Registry>>, options: Options) -> Result
 		log::debug!("Accepted connection from {}", addr);
 
 		let registry = registry.clone();
+		let index_repo_path = index_repo_path.clone();
 		tokio::spawn(async move {
 			let result = hyper::server::conn::Http::new()
-				.serve_connection(connection, hyper::service::service_fn(move |request| server::handle_request(registry.clone(), request)))
+				.serve_connection(connection, hyper::service::service_fn(move |request| {
+					server::handle_request(registry.clone(), index_repo_path.clone(), request)
+				}))
 				.await;
 			if let Err(e) = result {
-				log::error!("Error in connection with {}: {}", addr, e);
+				let message = e.to_string();
+				// EEEW! But hyper forces us to do this :(
+				if !message.starts_with("error shutting down connection:") {
+					log::error!("Error in connection with {}: {}", addr, message);
+				}
 			}
 		});
 	}
