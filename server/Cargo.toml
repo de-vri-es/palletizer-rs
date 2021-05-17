@@ -1,14 +1,17 @@
 [package]
 name = "palletizer-server"
+description = "API and download server for palletizer, a self hosted cargo registry"
 version = "0.1.0"
 authors = ["Maarten de Vries <maarten@de-vri.es>"]
+license = "BSD-2-Clause"
+repository = "https://github.com/de-vri-es/palletizer-rs"
 edition = "2018"
 
 [dependencies]
 env_logger = "0.8.3"
 hyper = { version = "0.14.7", features = ["http1", "http2", "server", "stream"] }
 log = "0.4.14"
-palletizer = { version = "0.0.0", path = ".." }
+palletizer = { version = "0.1.0", path = ".." }
 structopt = "0.3.20"
 tokio = { version = "1.5.0", features = ["net", "process", "rt", "rt-multi-thread"] }
 serde = { version = "1.0.126", features = ["derive"] }
