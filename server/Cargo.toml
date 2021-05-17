@@ -7,14 +7,22 @@ license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/palletizer-rs"
 edition = "2018"
 
+[features]
+default = ["tls"]
+tls = ["openssl", "tokio-openssl"]
+static-openssl = ["openssl/vendored"]
+
 [dependencies]
 env_logger = "0.8.3"
+futures = { version = "0.3.15", default-features = false, features = ["alloc"] }
 hyper = { version = "0.14.7", features = ["http1", "http2", "server", "stream"] }
 log = "0.4.14"
 palletizer = { version = "0.1.0", path = ".." }
-structopt = "0.3.20"
-tokio = { version = "1.5.0", features = ["net", "process", "rt", "rt-multi-thread"] }
 serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
 sha2 = "0.9.2"
-futures = { version = "0.3.15", default-features = false }
+structopt = "0.3.20"
+tokio = { version = "1.5.0", features = ["net", "process", "rt", "rt-multi-thread"] }
+tokio-openssl = { version = "0.6.1", optional = true }
+openssl = { version = "0.10.34", optional = true }
+toml = "0.5.7"

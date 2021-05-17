@@ -5,6 +5,7 @@ use structopt::StructOpt;
 use structopt::clap::AppSettings;
 
 mod api_v1;
+mod config;
 mod git;
 mod logging;
 mod server;
@@ -19,15 +20,17 @@ struct Options {
 	#[structopt(parse(from_occurrences))]
 	verbose: i8,
 
-	/// The root of of registry.
-	#[structopt(long, short)]
-	#[structopt(default_value = ".")]
-	registry: PathBuf,
+	/// The configuration file to use.
+	config: PathBuf,
+}
 
-	/// The address to bind to.
-	#[structopt(long, short)]
-	#[structopt(default_value = "[::]:8080")]
-	bind: String,
+impl Options {
+	fn load_config(&self) -> Result<config::Config, ()> {
+		let data = std::fs::read(&self.config)
+			.map_err(|e| log::error!("Failed to read {}: {}", self.config.display(), e))?;
+		toml::from_slice(&data)
+			.map_err(|e| log::error!("Failed to parse {}: {}", self.config.display(), e))
+	}
 }
 
 fn main() {
@@ -39,7 +42,10 @@ fn main() {
 }
 
 fn do_main(options: Options) -> Result<(), ()> {
-	let registry = Registry::open(&options.registry)
+	let config_dir = options.config.parent()
+		.ok_or_else(|| log::error!("Failed to determine parent directory of config file"))?;
+	let config = options.load_config()?;
+	let registry = Registry::open(config_dir.join(&config.registry))
 		.map_err(|e| log::error!("{}", e))?;
 	let index_repo_path = registry.index_dir();
 	let registry = Arc::new(RwLock::new(registry));
@@ -49,36 +55,85 @@ fn do_main(options: Options) -> Result<(), ()> {
 		.build()
 		.map_err(|e| log::error!("Failed to initialize I/O runtime: {}", e))?;
 
-	runtime.block_on(run_server(registry, index_repo_path, options))
+	runtime.block_on(async move {
+		let mut futures = Vec::new();
+		for listener in config.listeners {
+			futures.push(run_server(registry.clone(), index_repo_path.clone(), config_dir.to_path_buf(), listener));
+		}
+		futures::future::try_join_all(futures).await?;
+		Ok(())
+	})
 }
 
-async fn run_server(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, options: Options) -> Result<(), ()> {
-	let listener = tokio::net::TcpListener::bind(&options.bind)
+async fn run_server(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, config_dir: PathBuf, config: config::Listener) -> Result<(), ()> {
+	let listener = tokio::net::TcpListener::bind(&config.bind)
 		.await
-		.map_err(|e| log::error!("Failed to listen on {}: {}", &options.bind, e))?;
-	log::info!("Server listening on {}", options.bind);
+		.map_err(|e| log::error!("Failed to listen on {}: {}", &config.bind, e))?;
+	log::info!("Server listening on {}", config.bind);
+
+	#[cfg(feature = "tls")]
+	let tls_context = match config.tls.as_ref() {
+		None => None,
+		Some(tls) => {
+			let mut context = mozilla_modern_v5()
+				.map_err(|e| log::error!("Failed to create OpenSSL context: {}", e))?;
+			context.set_certificate_chain_file(config_dir.join(&tls.certificate_chain))
+				.map_err(|e| log::error!("Failed to load certificate chain: {}", e))?;
+			context.set_private_key_file(config_dir.join(&tls.private_key), openssl::ssl::SslFiletype::PEM)
+				.map_err(|e| log::error!("Failed to load private key: {}", e))?;
+			Some(context.build())
+		}
+	};
 
 	loop {
-		let (connection, addr) = listener.accept()
+		let (connection, address) = listener.accept()
 			.await
-			.map_err(|e| log::error!("Failed to accept connection on {}: {}", &options.bind, e))?;
-		log::debug!("Accepted connection from {}", addr);
+			.map_err(|e| log::error!("Failed to accept connection on {}: {}", &config.bind, e))?;
+		log::debug!("Accepted connection from {}", address);
 
-		let registry = registry.clone();
-		let index_repo_path = index_repo_path.clone();
-		tokio::spawn(async move {
-			let result = hyper::server::conn::Http::new()
-				.serve_connection(connection, hyper::service::service_fn(move |request| {
-					server::handle_request(registry.clone(), index_repo_path.clone(), request)
-				}))
-				.await;
-			if let Err(e) = result {
-				let message = e.to_string();
-				// EEEW! But hyper forces us to do this :(
-				if !message.starts_with("error shutting down connection:") {
-					log::error!("Error in connection with {}: {}", addr, message);
-				}
-			}
-		});
+		#[cfg(feature = "tls")]
+		if let Some(tls_context) = &tls_context {
+			let session = openssl::ssl::Ssl::new(tls_context)
+				.map_err(|e| log::error!("Failed to initialize TLS session: {}", e))?;
+			let mut connection = tokio_openssl::SslStream::new(session, connection)
+				.map_err(|e| log::error!("Failed to initialize TLS stream: {}", e))?;
+			std::pin::Pin::new(&mut connection)
+				.accept()
+				.await
+				.map_err(|e| log::error!("Failed to complete TLS handshake: {}", e))?;
+			tokio::spawn(serve_connection(connection, address, registry.clone(), index_repo_path.clone()));
+			continue;
+		}
+
+		tokio::spawn(serve_connection(connection, address, registry.clone(), index_repo_path.clone()));
 	}
+}
+
+async fn serve_connection<S>(connection: S, address: std::net::SocketAddr, registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf)
+where
+	S: tokio::io::AsyncRead + tokio::io::AsyncWrite + std::marker::Unpin + 'static,
+{
+	let result = hyper::server::conn::Http::new()
+		.serve_connection(connection, hyper::service::service_fn(move |request| {
+			server::handle_request(registry.clone(), index_repo_path.clone(), request)
+		}))
+		.await;
+	if let Err(e) = result {
+		let message = e.to_string();
+		// EEEW! But hyper forces us to do this :(
+		if !message.starts_with("error shutting down connection:") {
+			log::error!("Error in connection with {}: {}", address, message);
+		}
+	}
+}
+
+#[cfg(feature = "tls")]
+pub fn mozilla_modern_v5() -> Result<openssl::ssl::SslContextBuilder, openssl::error::ErrorStack> {
+	use openssl::ssl::{SslContext, SslMethod, SslOptions};
+	let mut context = SslContext::builder(SslMethod::tls_server())?;
+	context.set_options(SslOptions::NO_SSL_MASK & !SslOptions::NO_TLSV1_3);
+	context.set_ciphersuites(
+		"TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
+	)?;
+	Ok(context)
 }
