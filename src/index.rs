@@ -23,8 +23,8 @@ pub struct Entry {
 #[serde(deny_unknown_fields)]
 pub struct Dependency {
 	pub name: String,
-	#[serde(rename = "req")]
-	pub requirement: String,
+	#[serde(rename = "version_req")]
+	pub version: String,
 	pub features: Vec<String>,
 	pub optional: bool,
 	pub default_features: bool,
@@ -100,7 +100,7 @@ fn add_deps(out: &mut Vec<Dependency>, deps: BTreeMap<String, ManifestDependency
 	for (name, data) in deps {
 		out.push(Dependency {
 			name,
-			requirement: data.version,
+			version: data.version,
 			optional: data.optional,
 			features: data.features,
 			default_features: data.default_features,
