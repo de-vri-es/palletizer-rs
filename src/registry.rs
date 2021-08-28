@@ -222,9 +222,9 @@ impl Registry {
 	fn index_path_rel(&self, name: &str) -> PathBuf {
 		let mut file = match name.as_bytes() {
 			&[] => panic!("empty crate names are not supported"),
-			&[a] => format!("1/{}/{}", a as char, name),
-			&[a, b] => format!("2/{}/{}/{}", a as char, b as char, name),
-			&[a, b, c] => format!("3/{}/{}/{}/{}", a as char, b as char, c as char, name),
+			&[_] => format!("1/{}", name),
+			&[_, _] => format!("2/{}", name),
+			&[a, _, _] => format!("3/{}/{}", a as char, name),
 			&[a, b, c, d, ..] => format!("{}{}/{}{}/{}", a as char, b as char, c as char, d as char, name),
 		};
 		file.make_ascii_lowercase();
