@@ -24,6 +24,14 @@ pub struct Config {
 	///
 	/// Relative paths are resolved relative to directory that contains the config file.
 	pub crate_dir: PathBuf,
+
+	/// Allowed external registries for crates in this registry.
+	///
+	/// Packages with dependencies from other registries will be refused.
+	///
+	/// Each entry should be the full URL of the index repository of an external registry.
+	#[serde(default = "Default::default", skip_serializing_if = "Vec::is_empty")]
+	pub allowed_registries: Vec<String>,
 }
 
 impl Config {
@@ -33,6 +41,9 @@ impl Config {
 			api_url: "https://example.com".into(),
 			index_dir: "index".into(),
 			crate_dir: "crates".into(),
+			allowed_registries: vec![
+				"https://github.com/rust-lang/crates.io-index".into(),
+			],
 		}
 	}
 }

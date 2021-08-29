@@ -78,6 +78,15 @@ impl Registry {
 	pub fn add_crate_with_metadata(&mut self, metadata: &index::Entry, data: &[u8]) -> Result<(), Error> {
 		use std::io::Write;
 
+		// Check that all dependencies are in allowed registries.
+		for dep in &metadata.dependencies {
+			if let Some(registry) = &dep.registry {
+				if !self.config.allowed_registries.contains(registry) {
+					return Err(Error::new(format!("dependency `{}` has a non-allowed registry: {:?}", dep.name, registry)));
+				}
+			}
+		}
+
 		let metadata_json = serde_json::to_string(&metadata)
 			.map_err(|e| Error::new(format!("failed to serialize index metadata: {}", e)))?;
 
