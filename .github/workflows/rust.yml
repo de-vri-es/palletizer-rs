@@ -23,8 +23,6 @@ jobs:
         with:
           command: build
           args: --workspace --all-targets --all-features --color=always
-        env:
-          RUSTFLAGS: -Dwarnings
       - name: Clippy
         uses: actions-rs/clippy-check@v1
         with:
@@ -35,5 +33,3 @@ jobs:
         with:
           command: test
           args: --workspace --all-targets --all-features --color=always
-        env:
-          RUSTFLAGS: -Dwarnings
