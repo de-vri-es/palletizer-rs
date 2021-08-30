@@ -21,9 +21,9 @@ impl Registry {
 	pub fn init(path: impl AsRef<Path>, config: Config) -> Result<Self, Error> {
 		let path = path.as_ref().to_path_buf();
 
-		// Write Palletizer config file.
+		// Write palletizer config file.
 		util::write_new_file(
-			path.join("Palletizer.toml"),
+			path.join("palletizer.toml"),
 			&toml::ser::to_vec(&config).unwrap(),
 		)?;
 
@@ -45,7 +45,7 @@ impl Registry {
 	/// Open an existing registry.
 	pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
 		let path = path.as_ref().to_path_buf();
-		let config: Config = util::read_toml(path.join("Palletizer.toml"))?;
+		let config: Config = util::read_toml(path.join("palletizer.toml"))?;
 
 		let index_path = path.join(&config.index_dir);
 
