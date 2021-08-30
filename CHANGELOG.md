@@ -1,3 +1,6 @@
+# main
+* Add README.
+
 # v0.1.3 - 2021-08-30
 * Use lower case `palletizer.toml` as configuration file.
 * Fix format of dependencies in index entries.
