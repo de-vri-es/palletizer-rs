@@ -23,7 +23,7 @@ pub struct Entry {
 #[serde(deny_unknown_fields)]
 pub struct Dependency {
 	pub name: String,
-	#[serde(rename = "version_req")]
+	#[serde(rename = "req")]
 	pub version: String,
 	pub features: Vec<String>,
 	pub optional: bool,

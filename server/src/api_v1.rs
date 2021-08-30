@@ -80,7 +80,7 @@ struct NewCrateMeta {
 	version: String,
 
 	#[serde(rename = "deps")]
-	dependencies: Vec<palletizer::index::Dependency>,
+	dependencies: Vec<NewCrateDependency>,
 
 	features: BTreeMap<String, Vec<String>>,
 
@@ -89,12 +89,59 @@ struct NewCrateMeta {
 	// Other fields ignored, because not needed for the index.
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NewCrateDependency {
+	pub name: String,
+	#[serde(rename = "version_req")]
+	pub version: String,
+	pub features: Vec<String>,
+	pub optional: bool,
+	pub default_features: bool,
+	pub target: Option<String>,
+	pub kind: palletizer::index::DependencyKind,
+	pub registry: Option<String>,
+	pub explicit_name_in_toml: Option<String>,
+}
+
+impl NewCrateDependency {
+	fn into_index_dependency(self) -> palletizer::index::Dependency {
+		// Web API has flipped meaning for the `name` field for renamed dependencies.
+		// In the request body, it is the name of the actual package.
+		// In the index, it is the name after renaming.
+		let package;
+		let name;
+		if let Some(renamed) = self.explicit_name_in_toml {
+			name = renamed;
+			package = Some(self.name);
+		} else {
+			name = self.name;
+			package = None;
+		};
+
+		palletizer::index::Dependency {
+			name,
+			version: self.version,
+			features: self.features,
+			optional: self.optional,
+			default_features: self.default_features,
+			target: self.target,
+			kind: self.kind,
+			registry: self.registry,
+			package,
+		}
+	}
+}
+
 impl NewCrateMeta {
 	fn into_index_entry(self, crate_sha256: String) -> palletizer::index::Entry {
+		let dependencies = self.dependencies
+			.into_iter()
+			.map(NewCrateDependency::into_index_dependency)
+			.collect();
 		palletizer::index::Entry {
 			name: self.name,
 			version: self.version,
-			dependencies: self.dependencies,
+			dependencies,
 			features: self.features,
 			checksum_sha256: crate_sha256,
 			yanked: false,
