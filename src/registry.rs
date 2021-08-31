@@ -64,14 +64,50 @@ impl Registry {
 		&self.repo
 	}
 
-	/// Get the path of the index repository.
+	/// Get the absolute path of the index repository.
 	pub fn index_dir(&self) -> PathBuf {
 		self.path.join(&self.config.index_dir)
 	}
 
-	/// Get the path of the crate directory.
+	/// Get the absolute path of the crate directory.
 	pub fn crate_dir(&self) -> PathBuf {
 		self.path.join(&self.config.crate_dir)
+	}
+
+	/// Read the index entries for a specific crate.
+	pub fn read_index(&self, crate_name: &str) -> Result<Vec<index::Entry>, Error> {
+		let path = self.index_dir().join(self.index_path_rel(crate_name));
+		let file = util::open_file_read(&path)?;
+		read_index(file, &path)
+	}
+
+	/// Iterate over the names of all crates in the registry.
+	pub fn iter_crate_names(&self) -> impl Iterator<Item = Result<String, Error>> {
+		let index_dir = self.index_dir();
+		walkdir::WalkDir::new(&index_dir)
+			.max_depth(5)
+			.into_iter()
+			.filter_entry(|entry| {
+				// Skip hidden files (most importantly: .git).
+				entry.file_name().to_str().map(|name| !name.starts_with('.')).unwrap_or(true)
+			})
+			.filter_map(|item| {
+				let item = match item {
+					Err(e) => return Some(Err(Error::new(format!("Failed to read directory entry: {}", e)))),
+					Ok(x) => x,
+				};
+				// All crates live in at-least two subdirectories
+				if item.depth() < 3 {
+					return None;
+				}
+				if !item.file_type().is_file() {
+					return None;
+				}
+				match item.file_name().to_str() {
+					None => Some(Err(Error::new("invalid UTF-8 in file name".into()))),
+					Some(x) => Some(Ok(x.into())),
+				}
+			})
 	}
 
 	/// Add a crate to the registry using the supplied metadata.

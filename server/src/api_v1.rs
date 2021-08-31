@@ -6,7 +6,9 @@ use crate::Registry;
 use crate::server::{self, Request, Response, HttpError};
 
 pub async fn handle_request(registry: Arc<RwLock<Registry>>, request: Request, api_path: &str) -> Result<Response, HttpError> {
-	if let Some(api_path) = api_path.strip_prefix("crates/") {
+	if api_path == "crates" {
+		search(registry, request.uri().query())
+	} else if let Some(api_path) = api_path.strip_prefix("crates/") {
 		handle_crate_request(registry, request, api_path).await
 	} else {
 		server::not_found()
@@ -222,6 +224,88 @@ fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, meth
 			json_response("{\"ok\":true}")
 		},
 	}
+}
+
+fn search(registry: Arc<RwLock<Registry>>, url_query: Option<&str>) -> Result<Response, HttpError> {
+	#[derive(serde::Deserialize)]
+	struct Params<'a> {
+		q: Option<&'a str>,
+		per_page: Option<usize>,
+	}
+
+	#[derive(serde::Serialize)]
+	struct FoundCrate {
+		name: String,
+		max_version: String,
+		description: String,
+	}
+
+	#[derive(serde::Serialize)]
+	struct SearchResultsMeta {
+		total: usize,
+	}
+
+	#[derive(serde::Serialize)]
+	struct SearchResults {
+		crates: Vec<FoundCrate>,
+		meta: SearchResultsMeta,
+	}
+
+	let params: Params = match serde_urlencoded::from_str(url_query.unwrap_or("")) {
+		Err(e) => return error_response(e),
+		Ok(params) => params,
+	};
+
+	let query = params.q.unwrap_or("");
+	let max_results = params.per_page.unwrap_or(10);
+
+	let registry = registry.read().unwrap();
+
+	let mut crates: Vec<_> = registry.iter_crate_names()
+		.filter_map(|name| {
+			let name = match name {
+				Ok(x) => x,
+				Err(e) => {
+					log::warn!("{}", e);
+					return None;
+				},
+			};
+			if !name.contains(&query) {
+				return None;
+			}
+			let entries = match registry.read_index(&name) {
+				Ok(x) => x,
+				Err(e) => {
+					log::warn!("{}", e);
+					return None;
+				}
+			};
+
+			entries
+				.iter()
+				.filter_map(|entry| semver::Version::parse(&entry.version).ok())
+				.max_by_key(|version| version.clone())
+				.map(|version| {
+					FoundCrate {
+						name,
+						max_version: version.to_string(),
+						description: "".into(), // TODO: omfg, got to read the compressed crate file to extract the manifest
+					}
+				})
+		})
+		.collect();
+
+	let total = crates.len();
+	crates.truncate(max_results);
+
+	let json = serde_json::to_string(&SearchResults {
+		crates,
+		meta: SearchResultsMeta {
+			total,
+		}
+	}).unwrap();
+
+	json_response(json)
 }
 
 fn error_response(message: impl std::fmt::Display) -> Result<Response, HttpError> {
