@@ -262,16 +262,3 @@ pub fn read_index<R: std::io::Read>(mut stream: R, path: &Path) -> Result<Vec<in
 		})
 		.collect()
 }
-
-trait Rpartition {
-	fn rpartition(&self, split: char) -> Option<(&Self, &Self)>;
-}
-
-impl Rpartition for str {
-	fn rpartition(&self, split: char) -> Option<(&str, &str)> {
-		let mut parts = self.rsplitn(2, split);
-		let right = parts.next().unwrap();
-		let left = parts.next()?;
-		Some((left, right))
-	}
-}
