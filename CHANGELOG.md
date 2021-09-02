@@ -2,6 +2,7 @@
 * Add README.
 * Implement `search` API endpoint.
 * Add more logging to the server application.
+* Create new registries with user provided URL in the CLI tool.
 
 # v0.1.3 - 2021-08-30
 * Use lower case `palletizer.toml` as configuration file.

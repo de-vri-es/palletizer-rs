@@ -31,6 +31,28 @@ struct Init {
 	#[structopt(long, short)]
 	#[structopt(default_value = ".")]
 	registry: PathBuf,
+
+	/// URL of the server.
+	#[structopt(long, short)]
+	url: String,
+
+	/// Directory to store the index repository.
+	#[structopt(long)]
+	#[structopt(default_value = "index")]
+	index_dir: PathBuf,
+
+	/// Directory to store added crates.
+	#[structopt(long)]
+	#[structopt(default_value = "crates")]
+	crate_dir: PathBuf,
+
+	/// Custom allowed registries for dependencies.
+	#[structopt(long = "allowed-registry")]
+	allowed_registries: Vec<String>,
+
+	/// Do not automatically allow dependencies from crates.io.
+	#[structopt(long)]
+	no_crates_io: bool,
 }
 
 /// Add a crate to the registry.
@@ -100,7 +122,23 @@ fn do_main(options: Options) -> Result<(), ()> {
 }
 
 fn init(command: &Init) -> Result<(), ()> {
-	let config = palletizer::Config::example();
+	let download_url = format!("{}/crates/{{crate}}/{{crate}}-{{version}}.crate", command.url);
+	let api_url = command.url.clone();
+
+	let mut allowed_registries = Vec::with_capacity(command.allowed_registries.len() + 1);
+	if !command.no_crates_io {
+		allowed_registries.push(String::from("https://github.com/rust-lang/crates.io-index"));
+	}
+	allowed_registries.extend_from_slice(&command.allowed_registries);
+
+	let config = palletizer::Config {
+		download_url,
+		api_url,
+		index_dir: command.index_dir.clone(),
+		crate_dir: command.crate_dir.clone(),
+		allowed_registries: command.allowed_registries.clone(),
+	};
+
 	Registry::init(&command.registry, config)
 		.map_err(|e| eprintln!("{}", e))
 		.map(drop)

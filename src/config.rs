@@ -18,7 +18,7 @@ pub struct Config {
 	/// The path to the index repository.
 	///
 	/// Relative paths are resolved relative to directory that contains the config file.
-	pub index_dir: String,
+	pub index_dir: PathBuf,
 
 	/// The path where crates are stored.
 	///
