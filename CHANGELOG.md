@@ -1,7 +1,7 @@
 # main
 * Add README.
 * Implement `search` API endpoint.
-* Add more logging to the server application.
+* Add more logging to the server application and improve logging format.
 * Create new registries with user provided URL in the CLI tool.
 
 # v0.1.3 - 2021-08-30

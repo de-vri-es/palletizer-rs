@@ -20,6 +20,11 @@ struct Options {
 	#[structopt(parse(from_occurrences))]
 	verbose: i8,
 
+	/// Show less messages. Pass twice for even less messages.
+	#[structopt(long, short)]
+	#[structopt(parse(from_occurrences))]
+	quiet: i8,
+
 	/// The configuration file to use.
 	config: PathBuf,
 }
@@ -35,7 +40,7 @@ impl Options {
 
 fn main() {
 	let options = Options::from_args();
-	logging::init(env!("CARGO_CRATE_NAME"), options.verbose);
+	logging::init(module_path!(), &[], options.verbose - options.quiet);
 	if let Err(()) = do_main(options) {
 		std::process::exit(1);
 	}
