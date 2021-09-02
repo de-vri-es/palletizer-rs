@@ -64,6 +64,8 @@ impl Config {
 		};
 
 		// Unwrap should be fine: contents is always JSON encodable.
-		serde_json::to_string_pretty(&cargo_config).unwrap()
+		let mut json = serde_json::to_string_pretty(&cargo_config).unwrap();
+		json.push('\n');
+		json
 	}
 }
