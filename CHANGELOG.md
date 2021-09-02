@@ -14,5 +14,5 @@
 * Fix the name of the `version_req` field in index entries.
 
 # v0.1.0 - 2021-05-17
-* Support adding, removing, yanking and unyanking crates.
+* Support adding, yanking and unyanking crates.
 * Serve the index and registry API on a webserver.
