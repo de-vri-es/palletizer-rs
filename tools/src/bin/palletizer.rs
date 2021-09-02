@@ -23,6 +23,9 @@ enum Command {
 
 /// Initialize a new registry.
 #[derive(StructOpt)]
+#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::UnifiedHelpMessage)]
+#[structopt(setting = AppSettings::DeriveDisplayOrder)]
 struct Init {
 	/// The path of the registry to initialize.
 	#[structopt(long, short)]
@@ -32,6 +35,9 @@ struct Init {
 
 /// Add a crate to the registry.
 #[derive(StructOpt)]
+#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::UnifiedHelpMessage)]
+#[structopt(setting = AppSettings::DeriveDisplayOrder)]
 struct AddCrate {
 	/// The root of of registry to work on.
 	#[structopt(long, short)]
@@ -44,6 +50,9 @@ struct AddCrate {
 
 /// Yank a crate version from the registry.
 #[derive(StructOpt)]
+#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::UnifiedHelpMessage)]
+#[structopt(setting = AppSettings::DeriveDisplayOrder)]
 struct YankCrate {
 	/// The root of of registry to work on.
 	#[structopt(long, short)]
@@ -59,6 +68,9 @@ struct YankCrate {
 
 /// Unyank a crate version from the registry.
 #[derive(StructOpt)]
+#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::UnifiedHelpMessage)]
+#[structopt(setting = AppSettings::DeriveDisplayOrder)]
 struct UnyankCrate {
 	/// The root of of registry to work on.
 	#[structopt(long, short)]
