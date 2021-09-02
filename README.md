@@ -9,7 +9,8 @@ and performance problems will be taken seriously.
 
 Current features:
 * Host your crate data and index repository from the same server.
-* Publishing and yanking crates using the Cargo web API.
+* Publish and yank crates using the Cargo web API.
+* Search for crates using `cargo search --registry ...`.
 * Multiple listening sockets for the web server, each with independent (optional) TLS configuration.
 
 # Authentication
