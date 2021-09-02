@@ -1,4 +1,4 @@
-# main
+# v0.2.0 - 2021-09-02
 * Add README.
 * Implement `search` API endpoint.
 * Add more logging to the server application and improve logging format.
