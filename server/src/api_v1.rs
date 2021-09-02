@@ -11,6 +11,7 @@ pub async fn handle_request(registry: Arc<RwLock<Registry>>, request: Request, a
 	} else if let Some(api_path) = api_path.strip_prefix("crates/") {
 		handle_crate_request(registry, request, api_path).await
 	} else {
+		log::warn!("Got request for unknown or unimplemented API V1 endpoint: {}", api_path);
 		server::not_found()
 	}
 }
@@ -21,16 +22,25 @@ async fn handle_crate_request(registry: Arc<RwLock<Registry>>, request: Request,
 	} else {
 		let (name, rest) = match api_path.split_once('/') {
 			Some(x) => x,
-			None => return server::not_found(),
+			None => {
+				log::warn!("Failed to determine crate name from API url: {}", api_path);
+				return server::not_found();
+			},
 		};
 		let (version, action) = match rest.split_once('/') {
 			Some(x) => x,
-			None => return server::not_found(),
+			None => {
+				log::warn!("Failed to determine crate action from API url: {}", api_path);
+				return server::not_found();
+			},
 		};
 		match action {
 			"yank" => yank_crate(registry, name, version, request.method()),
 			"unyank" => unyank_crate(registry, name, version, request.method()),
-			_ => server::not_found()
+			_ => {
+				log::warn!("Got request for unknown or unimplemented crate action: {}", action);
+				server::not_found()
+			},
 		}
 	}
 }
@@ -39,6 +49,7 @@ async fn publish_crate(registry: Arc<RwLock<Registry>>, request: Request) -> Res
 	use sha2::Digest;
 
 	if let Some(response) = server::check_supported_method(request.method(), &[Method::PUT]) {
+		log::warn!("Unsupported request method for v1/crates/new: {}", request.method());
 		return response;
 	}
 

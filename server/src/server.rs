@@ -9,6 +9,7 @@ pub type Request = hyper::Request<hyper::Body>;
 pub type Response = hyper::Response<hyper::Body>;
 
 pub async fn handle_request(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, request: Request) -> Result<Response, HttpError> {
+	log::debug!("Got {} request for {}", request.method(), request.uri());
 	let path = request.uri().path().replace("//", "/");
 	if let Some(path) = path.strip_prefix("/crates/") {
 		get_crate(registry, path, request.method())
@@ -25,6 +26,7 @@ pub async fn handle_request(registry: Arc<RwLock<Registry>>, index_repo_path: Pa
 
 fn get_crate(registry: Arc<RwLock<Registry>>, path: &str, method: &Method) -> Result<Response, HttpError> {
 	if let Some(response) = check_supported_method(method, &[Method::GET, Method::HEAD]) {
+		log::warn!("Unsupported request method for crate download: {}", method);
 		return response;
 	}
 
@@ -34,12 +36,18 @@ fn get_crate(registry: Arc<RwLock<Registry>>, path: &str, method: &Method) -> Re
 		Ok(data) => data,
 		Err(e) => {
 			return match e.kind() {
-				std::io::ErrorKind::NotFound => not_found(),
-				std::io::ErrorKind::PermissionDenied => unauthorized(),
+				std::io::ErrorKind::NotFound => {
+					log::warn!("Received request for unknown crate: {}", path);
+					not_found()
+				},
+				std::io::ErrorKind::PermissionDenied => {
+					log::error!("Failed to read crate data: {}: {}", crate_path.display(), e);
+					unauthorized()
+				},
 				_ => {
 					log::error!("Failed to read crate data: {}: {}", crate_path.display(), e);
 					internal_server_error("Failed to read crate data")
-				}
+				},
 			};
 		},
 	};

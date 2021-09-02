@@ -1,6 +1,7 @@
 # main
 * Add README.
 * Implement `search` API endpoint.
+* Add more logging to the server application.
 
 # v0.1.3 - 2021-08-30
 * Use lower case `palletizer.toml` as configuration file.
