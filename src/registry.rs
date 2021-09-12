@@ -138,6 +138,18 @@ impl Registry {
 
 		util::lock_exclusive(&index_file, &index_path_abs)?;
 
+		#[cfg(unix)]
+		{
+			// Check that the file was not deleted before we locked it.
+			// We assume that nobody moved the file or created an extra hard link...
+			use std::os::unix::fs::MetadataExt;
+			let metadata = index_file.metadata()
+				.map_err(|e| Error::new(format!("failed to get hard-link count for {}: {}", index_path_abs.display(), e)))?;
+			if metadata.nlink() == 0 {
+				return Err(Error::new("crate was deleted while we tried to publish it".to_string()));
+			}
+		}
+
 		// Check that the version isn't in the index yet.
 		let index = read_index(&mut index_file, &index_path_abs)?;
 		if index.iter().any(|x| x.version == metadata.version) {
@@ -176,6 +188,49 @@ impl Registry {
 	pub fn add_crate_from_file(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
 		let data = util::read_file(path.as_ref())?;
 		self.add_crate(&data)
+	}
+
+	/// Delete a crate from the registry.
+	///
+	/// This will completely remove the index entry and the crate files.
+	/// Normally, you should yank a crate with [`Self::yank-crate()`] instead of deleting it.
+	pub fn delete_crate(&mut self, name: &str) -> Result<(), Error> {
+		let index_path_rel = self.index_path_rel(name);
+		let index_path_abs = self.index_dir().join(&index_path_rel);
+		let crate_dir_abs = self.path().join(self.crate_dir_rel(name));
+
+		let _index_file = if cfg!(unix) {
+			// On Unix, lock the index file for exclusive access to prevent racing with `add_crate`.
+			Some(util::open_file_read_write(&index_path_abs)?)
+		} else {
+			// On Windows, opening the file would prevent deletion so we can't open it here.
+			// But it also means that if `add_crate()` already opened the index, the delete below will fail.
+			None
+		};
+
+		// NOTE: We have inconsistent behaviour accross platforms when `delete_crate` and `add_crate` are done in parallel.
+		// Currently, on Unix, `add_crate` will fail and on Windows `delete_crate` will fail.
+		// This seems like a reasonable trade-off to avoid separate lock files though.
+
+		// Delete the index file.
+		std::fs::remove_file(&index_path_abs)
+			.map_err(|e| Error::new(format!("failed to delete {}: {}", index_path_abs.display(), e)))?;
+
+		// Delete all empty parent directories in the index repo.
+		for parent in index_path_rel.ancestors().skip(1) {
+			std::fs::remove_dir(self.index_dir().join(parent)).ok();
+		}
+
+		// Commit the changes.
+		util::add_commit(&self.repo, &format!("Delete crate {}", name), &[index_path_rel])
+			.map_err(|e| Error::new(format!("failed to commit changes: {}", e)))?;
+
+		// Delete the crate directory with all crate files.
+		// TODO: Only delete files matching published crate versions?.
+		std::fs::remove_dir_all(&crate_dir_abs)
+			.map_err(|e| Error::new(format!("failed to delete {}: {}", crate_dir_abs.display(), e)))?;
+
+		Ok(())
 	}
 
 	/// Yank a crate from the registry.
@@ -274,6 +329,10 @@ impl Registry {
 		};
 		file.make_ascii_lowercase();
 		file.into()
+	}
+
+	fn crate_dir_rel(&self, name: &str) -> PathBuf {
+		self.config.crate_dir.join(name)
 	}
 
 	fn crate_path_rel(&self, name: &str, version: &str) -> PathBuf {

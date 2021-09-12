@@ -17,6 +17,7 @@ struct Options {
 enum Command {
 	Init(Init),
 	Add(AddCrate),
+	Delete(DeleteCrate),
 	Yank(YankCrate),
 	Unyank(UnyankCrate),
 }
@@ -70,6 +71,21 @@ struct AddCrate {
 	crate_file: PathBuf,
 }
 
+/// Completely delete a crate from the registry.
+#[derive(StructOpt)]
+#[structopt(setting = AppSettings::ColoredHelp)]
+#[structopt(setting = AppSettings::UnifiedHelpMessage)]
+#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+struct DeleteCrate {
+	/// The root of of registry to work on.
+	#[structopt(long, short)]
+	#[structopt(default_value = ".")]
+	registry: PathBuf,
+
+	/// The name of the crate to delete.
+	name: String,
+}
+
 /// Yank a crate version from the registry.
 #[derive(StructOpt)]
 #[structopt(setting = AppSettings::ColoredHelp)]
@@ -116,6 +132,7 @@ fn do_main(options: Options) -> Result<(), ()> {
 	match &options.command {
 		Command::Init(command) => init(command),
 		Command::Add(command) => add_crate(command),
+		Command::Delete(command) => delete_crate(command),
 		Command::Yank(command) => yank_crate(command),
 		Command::Unyank(command) => unyank_crate(command),
 	}
@@ -148,6 +165,14 @@ fn add_crate(command: &AddCrate) -> Result<(), ()> {
 	let mut registry = Registry::open(&command.registry)
 		.map_err(|e| eprintln!("{}", e))?;
 	registry.add_crate_from_file(&command.crate_file)
+		.map_err(|e| eprintln!("{}", e))?;
+	Ok(())
+}
+
+fn delete_crate(command: &DeleteCrate) -> Result<(), ()> {
+	let mut registry = Registry::open(&command.registry)
+		.map_err(|e| eprintln!("{}", e))?;
+	registry.delete_crate(&command.name)
 		.map_err(|e| eprintln!("{}", e))?;
 	Ok(())
 }

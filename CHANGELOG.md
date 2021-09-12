@@ -1,3 +1,6 @@
+# main
+* Add method and CLI command to completely delete a crate.
+
 # v0.2.0 - 2021-09-02
 * Add README.
 * Implement `search` API endpoint.

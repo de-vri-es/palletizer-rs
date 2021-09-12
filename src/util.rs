@@ -56,8 +56,13 @@ pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Pa
 	// Add the files to the index.
 	for path in files {
 		let path = path.as_ref();
-		index.add_path(path)
-			.map_err(|e| Error::new(format!("failed to add {} to index: {}", path.display(), e)))?;
+		if path.exists() {
+			index.add_path(path)
+				.map_err(|e| Error::new(format!("failed to add {} to index: {}", path.display(), e)))?;
+		} else {
+			index.remove_path(path)
+				.map_err(|e| Error::new(format!("failed to delete {} from index: {}", path.display(), e)))?;
+		}
 	}
 	index.write().map_err(|e| Error::new(format!("failed to write index back to disk: {}", e)))?;
 

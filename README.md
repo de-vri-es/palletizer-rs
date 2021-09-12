@@ -12,6 +12,7 @@ Current features:
 * Publish and yank crates using the Cargo web API.
 * Search for crates using `cargo search --registry ...`.
 * Multiple listening sockets for the web server, each with independent (optional) TLS configuration.
+* Manually add/delete/yank/unyank crates from the command line.
 
 # Setting up a new registry
 The process of creating a new registry is fairy simple.
