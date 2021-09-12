@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "palletizer"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "fs2",
  "git2",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "palletizer-server"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chrono",
  "env_logger",
@@ -709,7 +709,7 @@ dependencies = [
 
 [[package]]
 name = "palletizer-tools"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "palletizer",
  "structopt",
