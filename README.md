@@ -13,6 +13,61 @@ Current features:
 * Search for crates using `cargo search --registry ...`.
 * Multiple listening sockets for the web server, each with independent (optional) TLS configuration.
 
+# Setting up a new registry
+The process of creating a new registry is fairy simple.
+You can create an empty registry using the `palletizer` command from the `palletizer-tools` crate.
+Then you can run the `palletizer-server` command from the `palletizer-server` crate to put the registry online.
+
+## Initializing a new registry
+Simply run `palletizer init --url "https://example.com"`.
+This will create a `palletizer.toml` file, an `index` git repository and a `crates` directory.
+The registry index must eventually be hosted at `$URL/index`, and the crates at `$URL/crates`.
+See the next section for instructions on setting up the server.
+
+You can use additional command line options to customize the registry further.
+You can change the path of the index repository and the crates directory with the `--index-dir` and `--crates-dir` options.
+
+By default, the new registry is configured to accept crates with dependencies from `crates.io`.
+You can disable this by adding the `--no-crates-io` flag,
+and you can allow additional registries with the `--allowed-registry` option.
+You should pass the full URL of the index for an allowed registry.
+
+## Setting up the server
+To run the server, you need to create a server configuration file first.
+
+A minimum configuration file could be `server.toml` in the same directory as the `palletizer.toml` created by `palletizer init`:
+```toml
+[[listener]]
+bind = "[::1]:8080"
+```
+
+The server can then be started by running `palletizer-server server.toml`.
+This will listen for connections on the loopback adapter on port 8080.
+
+You can configure any amount of listeners simply by adding more `[[listener]]` sections.
+Each listener can optionally be configured for HTTPS:
+```toml
+[[listener]]
+bind = "127.0.0.1:4333"
+tls = {
+   private_key = "/etc/letsencrypt/live/example.com/privkey.pem",
+   certificate_chain = "/etc/letsencrypt/live/example.com/fullchain.pem",
+}
+```
+
+It is also possible to have the server configuration file separate from the registry itself.
+In that case, you need to configure the path to the registry in the server configuration file:
+
+```toml
+registry = "/srv/my-little-registry"
+
+[[listener]]
+bind = "[::1]:8080"
+```
+
+Note that all relative paths in the configuration file will be interpreted relative to the folder of the configuration file itself,
+not with respect to the working directory of the server.
+
 # Authentication
 
 At the moment, Palletizer does not implement authentication.
