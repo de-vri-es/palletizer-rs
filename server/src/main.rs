@@ -10,6 +10,9 @@ mod git;
 mod logging;
 mod server;
 
+#[cfg(feature = "tls")]
+mod tls;
+
 #[derive(StructOpt)]
 #[structopt(setting = AppSettings::ColoredHelp)]
 #[structopt(setting = AppSettings::UnifiedHelpMessage)]
@@ -77,17 +80,9 @@ async fn run_server(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, c
 	log::info!("Server listening on {}", config.bind);
 
 	#[cfg(feature = "tls")]
-	let tls_context = match config.tls.as_ref() {
+	let mut tls_acceptor = match config.tls.as_ref() {
 		None => None,
-		Some(tls) => {
-			let mut context = mozilla_modern_v5()
-				.map_err(|e| log::error!("Failed to create OpenSSL context: {}", e))?;
-			context.set_certificate_chain_file(config_dir.join(&tls.certificate_chain))
-				.map_err(|e| log::error!("Failed to load certificate chain: {}", e))?;
-			context.set_private_key_file(config_dir.join(&tls.private_key), openssl::ssl::SslFiletype::PEM)
-				.map_err(|e| log::error!("Failed to load private key: {}", e))?;
-			Some(context.build())
-		}
+		Some(tls) => Some(tls::TlsAcceptor::from_config(tls, &config_dir)?),
 	};
 
 	loop {
@@ -97,15 +92,8 @@ async fn run_server(registry: Arc<RwLock<Registry>>, index_repo_path: PathBuf, c
 		log::debug!("Accepted connection from {}", address);
 
 		#[cfg(feature = "tls")]
-		if let Some(tls_context) = &tls_context {
-			let session = openssl::ssl::Ssl::new(tls_context)
-				.map_err(|e| log::error!("Failed to initialize TLS session: {}", e))?;
-			let mut connection = tokio_openssl::SslStream::new(session, connection)
-				.map_err(|e| log::error!("Failed to initialize TLS stream: {}", e))?;
-			std::pin::Pin::new(&mut connection)
-				.accept()
-				.await
-				.map_err(|e| log::error!("Failed to complete TLS handshake: {}", e))?;
+		if let Some(tls_acceptor) = &mut tls_acceptor {
+			let connection = tls_acceptor.accept(connection).await?;
 			tokio::spawn(serve_connection(connection, address, registry.clone(), index_repo_path.clone()));
 			continue;
 		}
@@ -130,15 +118,4 @@ where
 			log::error!("Error in connection with {}: {}", address, message);
 		}
 	}
-}
-
-#[cfg(feature = "tls")]
-pub fn mozilla_modern_v5() -> Result<openssl::ssl::SslContextBuilder, openssl::error::ErrorStack> {
-	use openssl::ssl::{SslContext, SslMethod, SslOptions};
-	let mut context = SslContext::builder(SslMethod::tls_server())?;
-	context.set_options(SslOptions::NO_SSL_MASK & !SslOptions::NO_TLSV1_3);
-	context.set_ciphersuites(
-		"TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
-	)?;
-	Ok(context)
 }
