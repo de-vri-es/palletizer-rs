@@ -1,4 +1,4 @@
-# Unreleased
+# v0.2.2 - 2021-10-03
 * Automatically reload TLS keys and certificates every 24 hours.
 
 # v0.2.1 - 2021-09-12
