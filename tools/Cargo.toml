@@ -1,12 +1,12 @@
 [package]
 name = "palletizer-tools"
 description = "CLI tools for palletizer, a self hosted cargo registry"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Maarten de Vries <maarten@de-vri.es>"]
 license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/palletizer-rs"
 edition = "2018"
 
 [dependencies]
-palletizer = { version = "0.2.2", path = ".." }
+palletizer = { version = "0.2.3", path = ".." }
 structopt = "0.3.20"
