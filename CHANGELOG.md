@@ -1,3 +1,6 @@
+# Unreleased
+* Fix deserialization of search queries with escaped characters.
+
 # v0.2.2 - 2021-10-03
 * Automatically reload TLS keys and certificates every 24 hours.
 
