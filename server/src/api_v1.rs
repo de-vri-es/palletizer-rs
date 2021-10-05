@@ -1,4 +1,5 @@
 use hyper::{header, Method};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
@@ -240,7 +241,7 @@ fn unyank_crate(registry: Arc<RwLock<Registry>>, name: &str, version: &str, meth
 fn search(registry: Arc<RwLock<Registry>>, url_query: Option<&str>) -> Result<Response, HttpError> {
 	#[derive(serde::Deserialize)]
 	struct Params<'a> {
-		q: Option<&'a str>,
+		q: Option<Cow<'a, str>>,
 		per_page: Option<usize>,
 	}
 
@@ -267,7 +268,8 @@ fn search(registry: Arc<RwLock<Registry>>, url_query: Option<&str>) -> Result<Re
 		Ok(params) => params,
 	};
 
-	let query = params.q.unwrap_or("");
+	let query = params.q.unwrap_or_else(|| "".into());
+	let query = query.as_ref();
 	let max_results = params.per_page.unwrap_or(10);
 
 	let registry = registry.read().unwrap();
