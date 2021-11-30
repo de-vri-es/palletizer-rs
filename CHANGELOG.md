@@ -1,3 +1,6 @@
+# main
+* Fix adding files to the index of the index repository.
+
 # v0.2.3 - 2021-10-05
 * Fix deserialization of search queries with escaped characters.
 

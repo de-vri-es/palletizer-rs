@@ -30,6 +30,9 @@ pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Pa
 	let signature = repo.signature()
 		.map_err(|e| Error::new(format!("failed to determine author for git commit: {}", e)))?;
 
+	let workdir = repo.workdir()
+		.ok_or_else(|| Error::new("failed to get worktree of repository".into()))?;
+
 	let head = get_head(repo)?;
 
 	let mut index = repo.index()
@@ -56,7 +59,7 @@ pub fn add_commit(repo: &git2::Repository, message: &str, files: &[impl AsRef<Pa
 	// Add the files to the index.
 	for path in files {
 		let path = path.as_ref();
-		if path.exists() {
+		if workdir.join(path).exists() {
 			index.add_path(path)
 				.map_err(|e| Error::new(format!("failed to add {} to index: {}", path.display(), e)))?;
 		} else {
