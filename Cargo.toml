@@ -1,7 +1,7 @@
 [package]
 name = "palletizer"
 description = "self-hosted Cargo registry"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Maarten de Vries <maarten@de-vri.es>"]
 license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/palletizer-rs"
