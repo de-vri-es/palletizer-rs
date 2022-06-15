@@ -1,19 +1,16 @@
 use palletizer::Registry;
 use std::path::PathBuf;
-use structopt::StructOpt;
-use structopt::clap::AppSettings;
 
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
+#[clap(version)]
 struct Options {
 	/// The command to run.
-	#[structopt(subcommand)]
+	#[clap(subcommand)]
 	command: Command,
 }
 
-#[derive(StructOpt)]
+#[derive(clap::Subcommand)]
 enum Command {
 	Init(Init),
 	Add(AddCrate),
@@ -23,48 +20,46 @@ enum Command {
 }
 
 /// Initialize a new registry.
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
+#[clap(version)]
 struct Init {
 	/// The path of the registry to initialize.
-	#[structopt(long, short)]
-	#[structopt(default_value = ".")]
+	#[clap(long, short)]
+	#[clap(default_value = ".")]
 	registry: PathBuf,
 
-	/// URL of the server.
-	#[structopt(long, short)]
+	/// The URL of the server.
+	#[clap(long, short)]
 	url: String,
 
 	/// Directory to store the index repository.
-	#[structopt(long)]
-	#[structopt(default_value = "index")]
+	#[clap(long)]
+	#[clap(default_value = "index")]
 	index_dir: PathBuf,
 
 	/// Directory to store added crates.
-	#[structopt(long)]
-	#[structopt(default_value = "crates")]
+	#[clap(long)]
+	#[clap(default_value = "crates")]
 	crate_dir: PathBuf,
 
 	/// Custom allowed registries for dependencies.
-	#[structopt(long = "allowed-registry")]
+	#[clap(long = "allowed-registry")]
 	allowed_registries: Vec<String>,
 
 	/// Do not automatically allow dependencies from crates.io.
-	#[structopt(long)]
+	#[clap(long)]
 	no_crates_io: bool,
 }
 
 /// Add a crate to the registry.
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
+#[clap(version)]
 struct AddCrate {
 	/// The root of of registry to work on.
-	#[structopt(long, short)]
-	#[structopt(default_value = ".")]
+	#[clap(long, short)]
+	#[clap(default_value = ".")]
 	registry: PathBuf,
 
 	/// The packaged crate file to add.
@@ -72,14 +67,13 @@ struct AddCrate {
 }
 
 /// Completely delete a crate from the registry.
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
+#[clap(version)]
 struct DeleteCrate {
 	/// The root of of registry to work on.
-	#[structopt(long, short)]
-	#[structopt(default_value = ".")]
+	#[clap(long, short)]
+	#[clap(default_value = ".")]
 	registry: PathBuf,
 
 	/// The name of the crate to delete.
@@ -87,14 +81,13 @@ struct DeleteCrate {
 }
 
 /// Yank a crate version from the registry.
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
+#[clap(version)]
 struct YankCrate {
 	/// The root of of registry to work on.
-	#[structopt(long, short)]
-	#[structopt(default_value = ".")]
+	#[clap(long, short)]
+	#[clap(default_value = ".")]
 	registry: PathBuf,
 
 	/// The name of the crate to yank.
@@ -105,14 +98,13 @@ struct YankCrate {
 }
 
 /// Unyank a crate version from the registry.
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
+#[clap(version)]
 struct UnyankCrate {
 	/// The root of of registry to work on.
-	#[structopt(long, short)]
-	#[structopt(default_value = ".")]
+	#[clap(long, short)]
+	#[clap(default_value = ".")]
 	registry: PathBuf,
 
 	/// The name of the crate to yank.
@@ -123,7 +115,7 @@ struct UnyankCrate {
 }
 
 fn main() {
-	if do_main(Options::from_args()).is_err() {
+	if do_main(clap::Parser::parse()).is_err() {
 		std::process::exit(1);
 	}
 }

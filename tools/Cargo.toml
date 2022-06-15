@@ -9,4 +9,4 @@ edition = "2018"
 
 [dependencies]
 palletizer = { version = "0.2.4", path = ".." }
-structopt = "0.3.20"
+clap = { version = "3.2.5", features = ["derive"] }
