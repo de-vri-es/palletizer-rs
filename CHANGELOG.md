@@ -1,3 +1,6 @@
+# Unreleased
+* Update dependencies.
+
 # v0.2.4 - 2021-11-30
 * Fix adding files to the index of the index repository.
 
