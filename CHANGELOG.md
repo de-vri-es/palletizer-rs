@@ -1,5 +1,7 @@
 # Unreleased
 * Update dependencies.
+* Add `registry.api_url()` and `registry.download_url()`.
+* Print config snippet for Cargo when initializing a new registry.
 
 # v0.2.4 - 2021-11-30
 * Fix adding files to the index of the index repository.

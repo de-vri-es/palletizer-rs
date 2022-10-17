@@ -54,6 +54,16 @@ impl Registry {
 		Ok(Self { path, config, repo })
 	}
 
+	/// Get the API URL of the registry.
+	pub fn api_url(&self) -> &str {
+		&self.config.api_url
+	}
+
+	/// Get the crate download URL of the registry.
+	pub fn download_url(&self) -> &str {
+		&self.config.download_url
+	}
+
 	/// Get the path of the registry.
 	pub fn path(&self) -> &Path {
 		&self.path

@@ -148,9 +148,17 @@ fn init(command: &Init) -> Result<(), ()> {
 		allowed_registries: command.allowed_registries.clone(),
 	};
 
-	Registry::init(&command.registry, config)
-		.map_err(|e| eprintln!("{}", e))
-		.map(drop)
+	let registry = Registry::init(&command.registry, config)
+		.map_err(|e| eprintln!("{}", e))?;
+
+	println!("Sucessfully initialized registry.");
+	println!();
+	println!("To use the registry, add this to your Cargo configuration (for example `$HOME/.cargo/config`):");
+	println!();
+	println!("[registries]");
+	println!("my-registry = {{ index = \"{url}/index\" }}", url = registry.api_url());
+
+	Ok(())
 }
 
 fn add_crate(command: &AddCrate) -> Result<(), ()> {
