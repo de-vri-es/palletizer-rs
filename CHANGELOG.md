@@ -1,4 +1,4 @@
-# Unreleased
+# v0.2.5 - 2026-01-22
 * Update dependencies.
 * Add `registry.api_url()` and `registry.download_url()`.
 * Print config snippet for Cargo when initializing a new registry.
