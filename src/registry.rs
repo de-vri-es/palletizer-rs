@@ -24,7 +24,7 @@ impl Registry {
 		// Write palletizer config file.
 		util::write_new_file(
 			path.join("palletizer.toml"),
-			&toml::ser::to_vec(&config).unwrap(),
+			toml::ser::to_vec(&config).unwrap(),
 		)?;
 
 		// Create the index repository.
@@ -350,7 +350,7 @@ impl Registry {
 	}
 
 	fn crate_path_abs(&self, name: &str, version: &str) -> PathBuf {
-		self.path().join(&self.crate_path_rel(name, version))
+		self.path().join(self.crate_path_rel(name, version))
 	}
 }
 

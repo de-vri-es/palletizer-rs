@@ -9,7 +9,7 @@ use crate::error::Error;
 /// Get the HEAD of a git repository, if it exists.
 ///
 /// This returns None if the HEAD is an unborn branch without any commits.
-fn get_head(repo: &git2::Repository) -> Result<Option<git2::Commit>, Error> {
+fn get_head(repo: &git2::Repository) -> Result<Option<git2::Commit<'_>>, Error> {
 	let head = match repo.head() {
 		Ok(head) => head,
 		Err(e) => if e.code() == git2::ErrorCode::UnbornBranch {
@@ -146,7 +146,6 @@ pub fn open_file_append(path: impl AsRef<Path>) -> Result<File, Error> {
 	}
 
 	let file = std::fs::OpenOptions::new()
-		.write(true)
 		.append(true)
 		.create(true)
 		.open(path)
@@ -255,7 +254,7 @@ pub fn read_toml<T: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> Resu
 
 /// Parse bytes as a TOML structure.
 pub fn parse_toml<'a, T: serde::Deserialize<'a>>(data: &'a [u8], path: &impl std::fmt::Display) -> Result<T, Error> {
-	toml::from_slice(&data)
+	toml::from_slice(data)
 		.map_err(|e| Error::new(format!("failed to parse TOML from {}: {}", path, e)))
 }
 
