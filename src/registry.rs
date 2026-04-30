@@ -24,7 +24,7 @@ impl Registry {
 		// Write palletizer config file.
 		util::write_new_file(
 			path.join("palletizer.toml"),
-			toml::ser::to_vec(&config).unwrap(),
+			toml::to_string(&config).unwrap(),
 		)?;
 
 		// Create the index repository.

@@ -47,8 +47,6 @@ async fn handle_crate_request(registry: Arc<RwLock<Registry>>, request: Request,
 }
 
 async fn publish_crate(registry: Arc<RwLock<Registry>>, request: Request) -> Result<Response, HttpError> {
-	use sha2::Digest;
-
 	if let Some(response) = server::check_supported_method(request.method(), &[Method::PUT]) {
 		log::warn!("Unsupported request method for v1/crates/new: {}", request.method());
 		return response;
@@ -70,7 +68,7 @@ async fn publish_crate(registry: Arc<RwLock<Registry>>, request: Request) -> Res
 		}
 	};
 
-	let crate_sha256 = format!("{:x}", sha2::Sha256::digest(crate_data));
+	let crate_sha256 = compute_sha256_hex(crate_data);
 	let index_entry = metadata.into_index_entry(crate_sha256);
 
 	let mut registry = registry.write().unwrap();
@@ -84,6 +82,18 @@ async fn publish_crate(registry: Arc<RwLock<Registry>>, request: Request) -> Res
 
 	log::info!("Published {}-{} with sha256 checksum {}", index_entry.name, index_entry.version, index_entry.checksum_sha256);
 	json_response("{\"warnings\":{\"invalid_categories\":[],\"invalid_badges\":[],\"other\":[]}}")
+}
+
+/// Compute the sha256sum of some data and return it as lowercase hex string.
+pub fn compute_sha256_hex(data: impl AsRef<[u8]>) -> String {
+	use std::fmt::Write;
+	use sha2::{Digest, Sha256};
+	let digest = Sha256::digest(data.as_ref());
+	let mut output = String::with_capacity(digest.len() * 2);
+	for byte in digest {
+		write!(output, "{byte:02X}").unwrap();
+	}
+	output
 }
 
 #[derive(serde::Deserialize)]
@@ -283,7 +293,7 @@ fn search(registry: Arc<RwLock<Registry>>, url_query: Option<&str>) -> Result<Re
 					return None;
 				},
 			};
-			if !name.contains(&query) {
+			if !name.contains(query) {
 				return None;
 			}
 			let entries = match registry.read_index(&name) {
@@ -342,7 +352,7 @@ fn error_response(message: impl std::fmt::Display) -> Result<Response, HttpError
 	json_response(body)
 }
 
-fn json_response(json: impl Into<hyper::Body>) -> Result<Response, HttpError> {
+fn json_response(json: impl Into<crate::server::Body>) -> Result<Response, HttpError> {
 	server::response_no_cache()
 		.header(header::CONTENT_TYPE, "application/json")
 		.body(json.into())

@@ -1,8 +1,9 @@
+use http_body_util::BodyExt as _;
 use hyper::{header, Method, StatusCode};
 use std::path::Path;
 use tokio::process::Command;
 
-use crate::server::{self, Request, Response, HttpError};
+use crate::server::{self, Body, HttpError, Request, Response};
 
 /// Handle requests for the git smart HTTP transport.
 pub async fn handle_request(repo_path: &Path, request: Request, rel_path: &str) -> Result<Response, HttpError> {
@@ -96,7 +97,6 @@ async fn handle_upload_pack_info(repo_path: &Path) -> Result<Response, HttpError
 ///
 /// This delegates to the system `git` command for the actual work.
 async fn handle_upload_pack(repo_path: &Path, mut request: Request) -> Result<Response, HttpError> {
-	use futures::StreamExt;
 	use tokio::io::AsyncWriteExt;
 	use tokio::io::AsyncBufReadExt;
 
@@ -131,13 +131,16 @@ async fn handle_upload_pack(repo_path: &Path, mut request: Request) -> Result<Re
 	let stderr = child.stderr.take().unwrap();
 
 	// Forward the request body to the stdin of the child.
-	while let Some(chunk) = request.body_mut().next().await {
-		let chunk = match chunk {
-			Ok(x) => x,
+	while let Some(frame) = request.body_mut().frame().await {
+		let chunk = match frame {
+			Ok(x) => x.into_data().ok(),
 			Err(e) => {
 				log::error!("Failed to read body chunk: {}", e);
 				return internal_server_error("internal server error");
 			}
+		};
+		let Some(chunk) = chunk else {
+			continue;
 		};
 		if let Err(e) = stdin.write_all(&chunk).await {
 			log::error!("Failed to write body chunk to git-upload-pack --stateless-rpc: {}", e);
@@ -175,11 +178,11 @@ async fn handle_upload_pack(repo_path: &Path, mut request: Request) -> Result<Re
 	hyper::Response::builder()
 		.header(header::CONTENT_TYPE, "application/x-git-upload-pack-result")
 		.header(header::CACHE_CONTROL, "no-store")
-		.body(hyper::Body::wrap_stream(ReadChunks::new(stdout, 512)))
+		.body(server::Body::Stream(stdout.into()))
 }
 
 /// Create a plain text HTTP response without any specific caching instructions.
-fn simple_response(status: StatusCode, message: impl Into<hyper::Body>) -> Result<Response, HttpError> {
+fn simple_response(status: StatusCode, message: impl Into<Body>) -> Result<Response, HttpError> {
 	hyper::Response::builder()
 		.status(status)
 		.header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
@@ -187,7 +190,7 @@ fn simple_response(status: StatusCode, message: impl Into<hyper::Body>) -> Resul
 }
 
 /// Create a plain text internal server error response that forbids caching.
-fn internal_server_error(message: impl Into<hyper::Body>) -> Result<Response, HttpError> {
+fn internal_server_error(message: impl Into<Body>) -> Result<Response, HttpError> {
 	hyper::Response::builder()
 		.status(StatusCode::INTERNAL_SERVER_ERROR)
 		.header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
@@ -195,55 +198,3 @@ fn internal_server_error(message: impl Into<hyper::Body>) -> Result<Response, Ht
 		.body(message.into())
 }
 
-
-/// Stream of chunks read from an [`tokio::io::AsyncRead`].
-struct ReadChunks<R> {
-	/// The stream being read from.
-	read_stream: R,
-
-	/// The maximum chunk size.
-	max_chunk_size: usize,
-
-	/// The temporary buffer for reading chunks.
-	buffer: Vec<u8>,
-}
-
-impl<R> ReadChunks<R> {
-	/// Wrap a [`tokio::io::AsyncRead`] in a [`ReadChunks`].
-	pub fn new(read_stream: R, max_chunk_size: usize) -> Self {
-		Self {
-			read_stream,
-			max_chunk_size,
-			buffer: vec![0; max_chunk_size],
-		}
-	}
-
-	/// Take the current buffer and replace it with a new one.
-	///
-	/// This resizes the temporary buffer to `valid` bytes and returns it.
-	/// A new buffer is created for the next read.
-	fn take_buffer(&mut self, valid: usize) -> Vec<u8> {
-		self.buffer.resize(valid, 0);
-		std::mem::replace(&mut self.buffer, vec![0; self.max_chunk_size])
-	}
-}
-
-impl<R: tokio::io::AsyncRead + std::marker::Unpin> futures::stream::Stream for ReadChunks<R> {
-	type Item = std::io::Result<hyper::body::Bytes>;
-
-	fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context) -> std::task::Poll<Option<Self::Item>> {
-		let me = self.get_mut();
-		let mut buffer = tokio::io::ReadBuf::new(&mut me.buffer);
-		match std::pin::Pin::new(&mut me.read_stream).poll_read(cx, &mut buffer)? {
-			std::task::Poll::Ready(()) => (),
-			std::task::Poll::Pending => return std::task::Poll::Pending,
-		};
-
-		let read = buffer.filled().len();
-		if read == 0 {
-			std::task::Poll::Ready(None)
-		} else {
-			std::task::Poll::Ready(Some(Ok(me.take_buffer(read).into())))
-		}
-	}
-}

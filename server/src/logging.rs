@@ -25,48 +25,41 @@ pub(crate) fn init(root_module: &str, extra_modules: &[&str], verbosity: i8) {
 
 	logger.format(
 		move |buffer, record: &log::Record| {
-			use env_logger::fmt::Color;
+			use env_logger::fmt::style::AnsiColor;
+			use env_logger::fmt::style::Style;
 
 			let now = chrono::Local::now();
-			let mut date_style = buffer.style();
-			let mut time_style = buffer.style();
-			let mut target_style = buffer.style();
-			let mut level_style = buffer.style();
+			let mut level_style = Style::new().bold();
 
-			date_style.set_color(Color::Cyan);
-			time_style.set_color(Color::Cyan);
-			target_style.set_color(Color::Magenta);
+			let date_style = Style::new().fg_color(Some(AnsiColor::Cyan.into()));
+			let time_style = Style::new().fg_color(Some(AnsiColor::Cyan.into()));
 
 			let level;
 			match record.level() {
 				log::Level::Trace => {
 					level = "Trace";
-					level_style.set_bold(true);
 				},
 				log::Level::Debug => {
 					level = "Debug";
-					level_style.set_bold(true);
 				},
 				log::Level::Info => {
 					level = "Info";
-					level_style.set_bold(true);
 				},
 				log::Level::Warn => {
 					level = "Warn";
-					level_style.set_color(Color::Yellow).set_bold(true);
+					level_style = level_style.fg_color(Some(AnsiColor::Yellow.into()));
 				},
 				log::Level::Error => {
 					level = "Error";
-					level_style.set_color(Color::Red).set_bold(true);
+					level_style = level_style.fg_color(Some(AnsiColor::Red.into()));
 				},
 			};
 
 			writeln!(
 				buffer,
-				"[{date} {time}] {level:<7} {message}",
-				date = date_style.value(now.format("%Y-%m-%d")),
-				time = time_style.value(now.format("%H:%M:%S%.3f")),
-				level = format_args!("[{}]", level_style.value(level)),
+				"[{date_style}{date}{date_style:#} {time_style}{time}{time_style:#}] {level_style}{level:<7}{level_style:#} {message}",
+				date = now.format("%Y-%m-%d"),
+				time = now.format("%H:%M:%S%.3f"),
 				message = record.args(),
 			)
 		}

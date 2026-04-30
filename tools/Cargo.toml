@@ -5,7 +5,7 @@ version = "0.2.5"
 authors = ["Maarten de Vries <maarten@de-vri.es>"]
 license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/palletizer-rs"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 palletizer = { version = "0.2.5", path = ".." }

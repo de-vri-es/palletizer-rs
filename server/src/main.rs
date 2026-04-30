@@ -106,16 +106,16 @@ async fn serve_connection<S>(connection: S, address: std::net::SocketAddr, regis
 where
 	S: tokio::io::AsyncRead + tokio::io::AsyncWrite + std::marker::Unpin + 'static,
 {
-	let result = hyper::server::conn::Http::new()
-		.serve_connection(connection, hyper::service::service_fn(move |request| {
-			server::handle_request(registry.clone(), index_repo_path.clone(), request)
-		}))
+	let service = hyper::service::service_fn(move |request| {
+		server::handle_request(registry.clone(), index_repo_path.clone(), request)
+	});
+	let connection = hyper_util::rt::TokioIo::new(connection);
+	let result = hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
+		.http1()
+		.keep_alive(true)
+		.serve_connection(connection, service)
 		.await;
 	if let Err(e) = result {
-		let message = e.to_string();
-		// EEEW! But hyper forces us to do this :(
-		if !message.starts_with("error shutting down connection:") {
-			log::error!("Error in connection with {}: {}", address, message);
-		}
+		log::error!("Error in connection with {address}: {e}");
 	}
 }

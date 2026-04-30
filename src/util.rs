@@ -260,6 +260,12 @@ pub fn parse_toml<'a, T: serde::Deserialize<'a>>(data: &'a [u8], path: &impl std
 
 /// Compute the sha256sum of some data and return it as lowercase hex string.
 pub fn compute_sha256_hex(data: impl AsRef<[u8]>) -> String {
+	use std::fmt::Write;
 	use sha2::{Digest, Sha256};
-	format!("{:x}", Sha256::digest(data.as_ref()))
+	let digest = Sha256::digest(data.as_ref());
+	let mut output = String::with_capacity(digest.len() * 2);
+	for byte in digest {
+		write!(output, "{byte:02X}").unwrap();
+	}
+	output
 }
