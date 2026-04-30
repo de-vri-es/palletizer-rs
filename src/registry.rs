@@ -126,10 +126,8 @@ impl Registry {
 
 		// Check that all dependencies are in allowed registries.
 		for dep in &metadata.dependencies {
-			if let Some(registry) = &dep.registry {
-				if !self.config.allowed_registries.contains(registry) {
-					return Err(Error::new(format!("dependency `{}` has a non-allowed registry: {:?}", dep.name, registry)));
-				}
+			if let Some(registry) = &dep.registry && !self.config.allowed_registries.contains(registry) {
+				return Err(Error::new(format!("dependency `{}` has a non-allowed registry: {:?}", dep.name, registry)));
 			}
 		}
 
