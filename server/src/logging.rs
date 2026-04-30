@@ -4,21 +4,21 @@ use std::io::Write;
 ///
 /// Logging for the specified root module will be set to Error, Warn, Info, Debug or Trace, depending on the verbosity parameter.
 /// Logging for all other modules is set to one level less verbose.
-pub(crate) fn init(root_module: &str, extra_modules: &[&str], verbosity: i8) {
+pub(crate) fn init(root_module: &str, extra_modules: &[&str], verbosity: i16) {
 	let log_level = match verbosity {
-		i8::MIN..=-2 => log::LevelFilter::Error,
+		i16::MIN..=-2 => log::LevelFilter::Error,
 		-1 => log::LevelFilter::Warn,
 		0 => log::LevelFilter::Info,
 		1 => log::LevelFilter::Debug,
-		2..=i8::MAX => log::LevelFilter::Trace,
+		2..=i16::MAX => log::LevelFilter::Trace,
 	};
 
 	let extra_level = match verbosity {
-		i8::MIN..=-1 => log::LevelFilter::Error,
+		i16::MIN..=-1 => log::LevelFilter::Error,
 		0 => log::LevelFilter::Warn,
 		1 => log::LevelFilter::Info,
 		2 => log::LevelFilter::Debug,
-		3..=i8::MAX => log::LevelFilter::Trace,
+		3..=i16::MAX => log::LevelFilter::Trace,
 	};
 
 	let mut logger = env_logger::Builder::new();

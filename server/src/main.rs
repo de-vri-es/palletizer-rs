@@ -1,8 +1,6 @@
 use palletizer::Registry;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use structopt::StructOpt;
-use structopt::clap::AppSettings;
 
 mod api_v1;
 mod config;
@@ -13,20 +11,17 @@ mod server;
 #[cfg(feature = "tls")]
 mod tls;
 
-#[derive(StructOpt)]
-#[structopt(setting = AppSettings::ColoredHelp)]
-#[structopt(setting = AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
 struct Options {
 	/// Show more messages. Pass twice for even more messages.
-	#[structopt(long, short)]
-	#[structopt(parse(from_occurrences))]
-	verbose: i8,
+	#[clap(long, short)]
+	#[clap(action = clap::ArgAction::Count)]
+	verbose: u8,
 
 	/// Show less messages. Pass twice for even less messages.
-	#[structopt(long, short)]
-	#[structopt(parse(from_occurrences))]
-	quiet: i8,
+	#[clap(long, short)]
+	#[clap(action = clap::ArgAction::Count)]
+	quiet: u8,
 
 	/// The configuration file to use.
 	config: PathBuf,
@@ -42,14 +37,14 @@ impl Options {
 }
 
 fn main() {
-	let options = Options::from_args();
-	logging::init(module_path!(), &[], options.verbose - options.quiet);
-	if let Err(()) = do_main(options) {
+	if let Err(()) = do_main(clap::Parser::parse()) {
 		std::process::exit(1);
 	}
 }
 
 fn do_main(options: Options) -> Result<(), ()> {
+	logging::init(module_path!(), &[], i16::from(options.verbose) - i16::from(options.quiet));
+
 	let config_dir = options.config.parent()
 		.ok_or_else(|| log::error!("Failed to determine parent directory of config file"))?;
 	let config = options.load_config()?;

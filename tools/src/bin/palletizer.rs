@@ -2,7 +2,6 @@ use palletizer::Registry;
 use std::path::PathBuf;
 
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
 #[clap(version)]
 struct Options {
 	/// The command to run.
@@ -21,8 +20,6 @@ enum Command {
 
 /// Initialize a new registry.
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
-#[clap(version)]
 struct Init {
 	/// The path of the registry to initialize.
 	#[clap(long, short)]
@@ -54,8 +51,6 @@ struct Init {
 
 /// Add a crate to the registry.
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
-#[clap(version)]
 struct AddCrate {
 	/// The root of of registry to work on.
 	#[clap(long, short)]
@@ -68,8 +63,6 @@ struct AddCrate {
 
 /// Completely delete a crate from the registry.
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
-#[clap(version)]
 struct DeleteCrate {
 	/// The root of of registry to work on.
 	#[clap(long, short)]
@@ -82,8 +75,6 @@ struct DeleteCrate {
 
 /// Yank a crate version from the registry.
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
-#[clap(version)]
 struct YankCrate {
 	/// The root of of registry to work on.
 	#[clap(long, short)]
@@ -99,8 +90,6 @@ struct YankCrate {
 
 /// Unyank a crate version from the registry.
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
-#[clap(version)]
 struct UnyankCrate {
 	/// The root of of registry to work on.
 	#[clap(long, short)]

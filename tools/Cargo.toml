@@ -8,5 +8,5 @@ repository = "https://github.com/de-vri-es/palletizer-rs"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
 palletizer = { version = "0.2.5", path = ".." }
-clap = { version = "3.2.5", features = ["derive"] }
