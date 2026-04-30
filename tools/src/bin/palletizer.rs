@@ -142,7 +142,7 @@ fn init(command: &Init) -> Result<(), ()> {
 
 	println!("Sucessfully initialized registry.");
 	println!();
-	println!("To use the registry, add this to your Cargo configuration (for example `$HOME/.cargo/config`):");
+	println!("To use the registry, add this to your Cargo configuration (for example `$HOME/.cargo/config.toml`):");
 	println!();
 	println!("[registries]");
 	println!("my-registry = {{ index = \"{url}/index\" }}", url = registry.api_url());
