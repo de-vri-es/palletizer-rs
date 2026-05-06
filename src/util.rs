@@ -265,7 +265,7 @@ pub fn compute_sha256_hex(data: impl AsRef<[u8]>) -> String {
 	let digest = Sha256::digest(data.as_ref());
 	let mut output = String::with_capacity(digest.len() * 2);
 	for byte in digest {
-		write!(output, "{byte:02X}").unwrap();
+		write!(output, "{byte:02x}").unwrap();
 	}
 	output
 }

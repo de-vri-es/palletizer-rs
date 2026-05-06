@@ -1,3 +1,6 @@
+# main
+* Fix SHA256 checksums to be lowercase.
+
 # v0.2.6 - 2026-04-30
 * Update dependencies.
 
