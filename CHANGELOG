@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.2.7 - 2026-05-06
 - [fix][minor] Fix SHA256 checksums to be lowercase.
 
 # Version 0.2.6 - 2026-04-30
