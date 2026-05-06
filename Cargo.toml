@@ -6,6 +6,7 @@ authors = ["Maarten de Vries <maarten@de-vri.es>"]
 license = "BSD-2-Clause"
 repository = "https://github.com/de-vri-es/palletizer-rs"
 edition = "2024"
+publish = ["crates-io"]
 
 [dependencies]
 fs2 = "0.4.3"
